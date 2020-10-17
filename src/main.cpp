@@ -62,9 +62,11 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 
 
 
-        recursiveRayTracing(scene, bvh, ray, hitInfo,0, 5);
+        //recursiveRayTracing(scene, bvh, ray, hitInfo,0, 5);
             //reflect.origin = glm::normalize(reflect.origin);
+        Ray reflection = calculateReflectionRay(ray, hitInfo);
 
+        drawRay(reflection);
         return glm::vec3{1.0f};
     } else {
         // Draw a red debug ray if the ray missed.

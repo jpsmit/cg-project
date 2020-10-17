@@ -13,12 +13,10 @@ DISABLE_WARNINGS_POP()
 
 Ray calculateReflectionRay(Ray ray, HitInfo hitInfo) {
     glm::vec3 vertexPos = ray.origin + (ray.direction * ray.t);
-    glm::vec3 incident = vertexPos - ray.origin;
-    if (incident != glm::vec3{ 0.0f }) {
-        incident = glm::normalize(incident);
-    }
+    glm::vec3 incident = ray.origin - vertexPos;
+    incident = glm::normalize(incident);
     glm::vec3 reflectionDirection = glm::reflect(incident, hitInfo.normal);
-    reflectionDirection = glm::normalize(reflectionDirection);
+    reflectionDirection = glm::normalize(-reflectionDirection);
     Ray reflectionRay = Ray{ vertexPos, reflectionDirection};
     return reflectionRay;
 
