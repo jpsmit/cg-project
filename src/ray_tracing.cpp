@@ -19,7 +19,7 @@ Ray calculateReflectionRay(Ray ray, HitInfo hitInfo) {
     }
     glm::vec3 reflectionDirection = glm::reflect(incident, hitInfo.normal);
     reflectionDirection = glm::normalize(reflectionDirection);
-    Ray reflectionRay = Ray{ vertexPos,reflectionDirection };
+    Ray reflectionRay = Ray{ vertexPos, reflectionDirection};
     return reflectionRay;
 
 }
