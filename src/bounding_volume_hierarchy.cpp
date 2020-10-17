@@ -43,6 +43,7 @@ bool BoundingVolumeHierarchy::intersect(Ray& ray, HitInfo& hitInfo) const
             const auto v1 = mesh.vertices[tri[1]];
             const auto v2 = mesh.vertices[tri[2]];
             if (intersectRayWithTriangle(v0.p, v1.p, v2.p, ray, hitInfo)) {
+
                 hitInfo.material = mesh.material;
                 hit = true;
             }
