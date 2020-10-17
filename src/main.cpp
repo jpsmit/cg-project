@@ -41,10 +41,30 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 {
     HitInfo hitInfo;
     if (bvh.intersect(ray, hitInfo)) {
-        // Draw a white debug ray.
-        drawRay(ray, glm::vec3(1.0f));
-        // Set the color of the pixel to white if the ray hits.
-        return glm::vec3(1.0f);
+        glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
+        //float count = 0;
+        glm::vec3 diffuse{ 0 };
+        glm::vec3 spec{ 0 };
+        for (PointLight const light : scene.pointLights) {
+            glm::vec3 lightVec = glm::normalize(intersectPos - light.position);
+            glm::vec3 normal = glm::normalize(hitInfo.normal);
+            float dot = glm::dot(normal, lightVec);
+            diffuse = diffuse + (hitInfo.material.kd * light.color * dot);
+            //count++;
+
+            glm::vec3 viewVec = glm::normalize(ray.origin - intersectPos);
+            glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
+
+            float dotprod = glm::dot(viewVec, reflectionVec);
+
+            spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess));
+
+        }
+        Ray rey{ intersectPos, hitInfo.normal, 1 };
+        glm::vec3 res = diffuse + spec;
+        drawRay(rey, glm::vec3{ 1.0f });
+        //std::cout << res.x << "y :" << res.y << "Z: " << res.z << std::endl;
+        return res;
     } else {
         // Draw a red debug ray if the ray missed.
         drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));

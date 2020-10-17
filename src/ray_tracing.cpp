@@ -61,8 +61,12 @@ bool intersectRayWithTriangle(const glm::vec3& v0, const glm::vec3& v1, const gl
         glm::vec3 p = newRay.origin + newRay.direction * newRay.t;
 
         if (pointInTriangle(v0, v1, v2, plane.normal, p)) {
-            ray.t = newRay.t;
-            hitInfo.normal = plane.normal;
+            if (newRay.t < ray.t) {
+                hitInfo.normal = plane.normal;
+                ray.t = newRay.t;
+            }
+            
+            
             return true;
         }
     }
