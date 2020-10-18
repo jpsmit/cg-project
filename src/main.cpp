@@ -37,14 +37,14 @@ enum class ViewMode {
 
 
 static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel) {
-    drawRay(ray, glm::vec3(1.0f));
     Ray reflect = calculateReflectionRay(ray, hitInfo);
     Ray prev = reflect;
     if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
-        recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel);
+        drawRay(reflect);
+        return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel);
     }
     else {
-        drawRay(prev, glm::vec3(1.0f, 0.0f, 0.0f));
+        drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
     }
     return glm::vec3{ 1.0f };
 }
@@ -54,8 +54,12 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 {
     HitInfo hitInfo;
     //return recursiveRayTracing(scene, bvh, ray, hitInfo);
-    int level = 5;
+    int level = 10;
+    
     if (bvh.intersect(ray, hitInfo)) {
+        drawRay(ray);
+        return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5);
+        /*
         // Draw a white debug ray.
         drawRay(ray, glm::vec3(1.0f));
         // Draw a white debug ray.
@@ -65,8 +69,19 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         //recursiveRayTracing(scene, bvh, ray, hitInfo,0, 5);
             //reflect.origin = glm::normalize(reflect.origin);
         Ray reflection = calculateReflectionRay(ray, hitInfo);
-
         drawRay(reflection);
+        if (bvh.intersect(reflection, hitInfo)) {
+            drawRay(reflection);
+            reflection = calculateReflectionRay(reflection, hitInfo);
+            if (bvh.intersect(reflection, hitInfo)) {
+                drawRay(reflection);
+            }
+
+        }
+        */
+        //drawRay(reflection);
+
+
         return glm::vec3{1.0f};
     } else {
         // Draw a red debug ray if the ray missed.
@@ -74,6 +89,7 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
+    
     
 }
 
