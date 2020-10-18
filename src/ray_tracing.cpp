@@ -44,8 +44,8 @@ bool intersectRayWithPlane(const Plane& plane, Ray& ray)
 Plane trianglePlane(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2)
 {
     Plane plane;
-    plane.normal = glm::normalize(glm::cross((v2 - v0), (v1 - v0)));
-    plane.D = glm::dot(v0, glm::normalize(glm::cross((v2 - v0), (v1 - v0))));
+    plane.normal = glm::normalize(glm::cross((v1 - v0), (v2 - v0)));
+    plane.D = glm::dot(v0, glm::normalize(glm::cross((v1 - v0), (v2 - v0))));
     return plane;
 }
 
@@ -94,7 +94,7 @@ bool intersectRayWithShape(const Sphere& sphere, Ray& ray, HitInfo& hitInfo)
             hitInfo.material = sphere.material;
             glm::vec3 selectedPos = ray.origin + ray.direction * ray.t;
             glm::vec3 normalDirection = glm::normalize(selectedPos - sphere.center);
-            hitInfo.normal = selectedPos + normalDirection;
+            hitInfo.normal = normalDirection;
         }
         return true;
     }
