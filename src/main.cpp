@@ -39,9 +39,15 @@ enum class ViewMode {
 static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel) {
     Ray reflect = calculateReflectionRay(ray, hitInfo);
     Ray prev = reflect;
+    HitInfo prevHit = hitInfo;
     if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
         drawRay(reflect);
-        return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel);
+        if (hitInfo.material.ks != glm::vec3{ 0 }) {
+            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel);
+        }
+        else {
+            return prevHit.material.kd;
+        }
     }
     else {
         drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
@@ -58,7 +64,9 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     
     if (bvh.intersect(ray, hitInfo)) {
         drawRay(ray);
-        return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5);
+        if (hitInfo.material.ks != glm::vec3{ 0 }) {
+            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5);
+        }
         /*
         // Draw a white debug ray.
         drawRay(ray, glm::vec3(1.0f));
