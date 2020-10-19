@@ -67,7 +67,6 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         Ray rey{ intersectPos, hitInfo.normal, 1 };
         glm::vec3 res = diffuse + spec;
         drawRay(rey, res);
-        //std::cout << res.x << "y :" << res.y << "Z: " << res.z << std::endl;
         return res;
     } else {
         // Draw a red debug ray if the ray missed.
