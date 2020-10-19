@@ -10,6 +10,18 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 #include <limits>
 
+
+Ray calculateReflectionRay(Ray ray, HitInfo hitInfo) {
+    glm::vec3 vertexPos = ray.origin + (ray.direction * ray.t);
+    glm::vec3 incident = ray.origin - vertexPos;
+    incident = glm::normalize(incident);
+    glm::vec3 reflectionDirection = glm::reflect(incident, hitInfo.normal);
+    reflectionDirection = glm::normalize(-reflectionDirection);
+    Ray reflectionRay = Ray{ vertexPos + (glm::vec3{0.007f,0.007f,0.007f}  * hitInfo.normal), reflectionDirection };
+    return reflectionRay;
+
+}
+
 bool pointInTriangle(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, const glm::vec3& n, const glm::vec3& p)
 {
     float s0 = glm::dot(glm::cross((p - v0), (v2 - v0)), n);
@@ -31,7 +43,7 @@ bool intersectRayWithPlane(const Plane& plane, Ray& ray)
     float dotprod = glm::dot(plane.normal, ray.direction);
     if (dotprod != 0) {
         float d = (plane.D - glm::dot(plane.normal, ray.origin)) / dotprod;
-        if (d < ray.t) {
+        if (d < ray.t && d > 0) {
             ray.t = d;
         }
 
@@ -44,8 +56,8 @@ bool intersectRayWithPlane(const Plane& plane, Ray& ray)
 Plane trianglePlane(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2)
 {
     Plane plane;
-    plane.normal = glm::normalize(glm::cross((v2 - v0), (v1 - v0)));
-    plane.D = glm::dot(v0, glm::normalize(glm::cross((v2 - v0), (v1 - v0))));
+    plane.normal = glm::normalize(glm::cross((v1 - v0), (v2 - v0)));
+    plane.D = glm::dot(v0, glm::normalize(glm::cross((v1 - v0), (v2 - v0))));
     return plane;
 }
 
