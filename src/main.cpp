@@ -67,30 +67,36 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
             return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5);
         }
-        /*
-        // Draw a white debug ray.
-        drawRay(ray, glm::vec3(1.0f));
-        // Draw a white debug ray.
+        else {
+            glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
+            //float count = 0;
+            glm::vec3 diffuse{ 0 };
+            glm::vec3 spec{ 0 };
+            for (PointLight const light : scene.pointLights) {
+                glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
+                glm::vec3 normal = glm::normalize(hitInfo.normal);
+                float dot = glm::dot(normal, lightVec);
+                if (dot > 0) {
+                    diffuse = diffuse + (hitInfo.material.kd * light.color * dot);
+                }
+            
+                //count++;
 
+                glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
+                glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
 
+                float dotprod = glm::dot(viewVec, reflectionVec);
+                if (dotprod > 0) {
+                    spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess));
+                }
 
-        //recursiveRayTracing(scene, bvh, ray, hitInfo,0, 5);
-            //reflect.origin = glm::normalize(reflect.origin);
-        Ray reflection = calculateReflectionRay(ray, hitInfo);
-        drawRay(reflection);
-        if (bvh.intersect(reflection, hitInfo)) {
-            drawRay(reflection);
-            reflection = calculateReflectionRay(reflection, hitInfo);
-            if (bvh.intersect(reflection, hitInfo)) {
-                drawRay(reflection);
             }
-
+            Ray rey{ intersectPos, hitInfo.normal, 1 };
+            glm::vec3 res = diffuse + spec;
+            //drawRay(rey, res);
+            return res;
         }
-        */
-        //drawRay(reflection);
 
-
-        return glm::vec3{1.0f};
     } else {
         // Draw a red debug ray if the ray missed.
         drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));

@@ -104,7 +104,7 @@ bool intersectRayWithShape(const Sphere& sphere, Ray& ray, HitInfo& hitInfo)
             hitInfo.material = sphere.material;
             glm::vec3 selectedPos = ray.origin + ray.direction * ray.t;
             glm::vec3 normalDirection = glm::normalize(selectedPos - sphere.center);
-            hitInfo.normal = selectedPos + normalDirection;
+            hitInfo.normal = normalDirection;
         }
         return true;
     }
