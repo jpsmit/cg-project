@@ -35,24 +35,51 @@ enum class ViewMode {
     RayTracing = 1
 };
 
+static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo) {
+    glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
+    //float count = 0;
+    glm::vec3 diffuse{ 0 };
+    glm::vec3 spec{ 0 };
+    for (PointLight const light : scene.pointLights) {
+        glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
+        glm::vec3 normal = glm::normalize(hitInfo.normal);
+        float dot = glm::dot(normal, lightVec);
+        if (dot > 0) {
+            diffuse = diffuse + (hitInfo.material.kd * light.color * dot);
+        }
 
-static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel) {
+        //count++;
+
+        glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
+        glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
+
+        float dotprod = glm::dot(viewVec, reflectionVec);
+        if (dotprod > 0) {
+            spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess));
+        }
+
+    }
+    Ray rey{ intersectPos, hitInfo.normal, 1 };
+    glm::vec3 res = diffuse + spec;
+    //drawRay(rey, res);
+    return res;
+}
+
+static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor) {
     Ray reflect = calculateReflectionRay(ray, hitInfo);
     Ray prev = reflect;
     HitInfo prevHit = hitInfo;
     if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
         drawRay(reflect);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel);
-        }
-        else {
-            return prevHit.material.kd;
+            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo));
         }
     }
     else {
         drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
+        return hitColor;
     }
-    return glm::vec3{ 1.0f };
+    return hitColor + getFaceColour(scene, bvh, ray, hitInfo);
 }
 
 // NOTE(Mathijs): separate function to make recursion easier (could also be done with lambda + std::function).
@@ -65,41 +92,14 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     if (bvh.intersect(ray, hitInfo)) {
         drawRay(ray);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5);
+            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd);
         }
         else {
-            glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
-            //float count = 0;
-            glm::vec3 diffuse{ 0 };
-            glm::vec3 spec{ 0 };
-            for (PointLight const light : scene.pointLights) {
-                glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
-                glm::vec3 normal = glm::normalize(hitInfo.normal);
-                float dot = glm::dot(normal, lightVec);
-                if (dot > 0) {
-                    diffuse = diffuse + (hitInfo.material.kd * light.color * dot);
-                }
-            
-                //count++;
-
-                glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
-                glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
-
-                float dotprod = glm::dot(viewVec, reflectionVec);
-                if (dotprod > 0) {
-                    spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess));
-                }
-
-            }
-            Ray rey{ intersectPos, hitInfo.normal, 1 };
-            glm::vec3 res = diffuse + spec;
-            //drawRay(rey, res);
-            return res;
+            return getFaceColour(scene, bvh, ray, hitInfo);
         }
-
     } else {
         // Draw a red debug ray if the ray missed.
-        drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
+        //drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
