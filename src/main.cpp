@@ -36,6 +36,7 @@ enum class ViewMode {
 };
 
 
+
 static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor) {
     Ray reflect = calculateReflectionRay(ray, hitInfo);
     Ray prev = reflect;
@@ -43,14 +44,14 @@ static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHie
     if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
         drawRay(reflect);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor += hitInfo.material.kd);
+            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + hitInfo.material.kd);
         }
     }
     else {
         drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
         return hitColor;
     }
-    return hitColor;
+    return hitColor + hitInfo.material.kd;
 }
 
 // NOTE(Mathijs): separate function to make recursion easier (could also be done with lambda + std::function).
@@ -63,7 +64,7 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     if (bvh.intersect(ray, hitInfo)) {
         drawRay(ray);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, glm::vec3{ hitInfo.material.kd });
+            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd);
         }
         /*
         // Draw a white debug ray.
@@ -86,12 +87,14 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         }
         */
         //drawRay(reflection);
-
-
+        /*if (hitInfo.material.transparency != 0.0f) {
+            return glm::vec3{ 0.0f, 1.0f, 0.0f } * hitInfo.material.transparency;
+        }*/
+        //std::cout << hitInfo.material.kd.x << ", " << hitInfo.material.kd.y << ", " << hitInfo.material.kd.z << std::endl;
         return hitInfo.material.kd;
     } else {
         // Draw a red debug ray if the ray missed.
-        drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
+        //drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
