@@ -26,37 +26,39 @@ DISABLE_WARNINGS_POP()
 #endif
 
 // This is the main application. The code in here does not need to be modified.
-constexpr glm::ivec2 windowResolution { 800, 800 };
-const std::filesystem::path dataPath { DATA_DIR };
-const std::filesystem::path outputPath { OUTPUT_DIR };
+constexpr glm::ivec2 windowResolution{ 800, 800 };
+const std::filesystem::path dataPath{ DATA_DIR };
+const std::filesystem::path outputPath{ OUTPUT_DIR };
+
+std::random_device rd;                                  // NOTE: (Jean-Paul) These imports are essential for random point generation
+std::mt19937 gen(rd());                                 // https://stackoverflow.com/questions/9878965/rand-between-0-and-1
+std::uniform_real_distribution<> dis(-1, 1);
 
 enum class ViewMode {
     Rasterization = 0,
     RayTracing = 1
 };
 
-float r;
-std::vector<glm::vec3> random_points;
-
-void initialize() {
-    float r = 0.25;                                                 // radius of our light sphere
-    float samples = 8;                                              // # of random points (samples) inside our light sphere
-
+// Random vector generation happens at the beginning to
+//   distribute the spherical lights
+std::vector<glm::vec3> randomVectors;
+void initialize(int samples) {
     for (int i = 0; i < samples; i++) {
-        float xr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
-        float yr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
-        float zr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
+        float xr = dis(gen);
+        float yr = dis(gen);
+        float zr = dis(gen);
 
-        glm::vec3 randomvector = (glm::vec3(xr * r, yr * r, zr * r));
-        random_points.push_back(randomvector);
+        glm::vec3 randomVector = 0.9f * glm::vec3(xr, yr, zr);
+        randomVectors.push_back(randomVector);
     }
 }
 
 // Hard Shadows
-// test if any object lies between hitpoint and lightsource
-bool castShadow(glm::vec3 vertexPos, PointLight lightsource, BoundingVolumeHierarchy bvh) {
-    float distance = glm::length(vertexPos - lightsource.position);
-    glm::vec3 destination = lightsource.position;
+// tests if any object lies between hitpoint and lightsource
+// returns true if position is in a shadow, false if facing light
+bool castShadow(glm::vec3 vertexPos, glm::vec3 lightsource, BoundingVolumeHierarchy bvh) {
+    float distance = glm::length(vertexPos - lightsource);
+    glm::vec3 destination = lightsource;
     glm::vec3 origin = vertexPos;
     glm::vec3 direction = glm::normalize(destination - origin);
 
@@ -69,51 +71,88 @@ bool castShadow(glm::vec3 vertexPos, PointLight lightsource, BoundingVolumeHiera
     HitInfo h;
     bool intersects = bvh.intersect(shadowray, h);
     if (!(distance < shadowray.t)) {
-        drawRay(shadowray, glm::vec3{ 1.0f, 0 ,0 }); // draw a debug ray
-        return false; 
+        drawRay(shadowray, glm::vec3{ 1.0f, 1.0f ,1.0f }); // draw a red debug ray
+        return true;
     }
-    drawRay(shadowray, glm::vec3{ 0.0f, 1.0f ,0 }); // draw a debug ray
-    return (distance < shadowray.t);
+    drawRay(shadowray, glm::vec3{ 0.0f, 1.0f ,0 }); // draw a green debug ray if not in a shadow
+    return false;
 }
 
+// Soft Shadows
+// Creates a spherical light source with center and radius.
+// returns the percentage of shadow coverage
+float softShadow(glm::vec3 intersectionPos, SphericalLight sphericalLight, const BoundingVolumeHierarchy& bvh) {
+    glm::vec3 center = sphericalLight.position;                             // center of our light sphere
+    float r = sphericalLight.radius;
+
+    if (r == 0) {                                                       // if pointed to the light
+        if (castShadow(intersectionPos, center, bvh)) return 1;              // If in shadow skip further computation for this lightsource
+    }
+    // we generate random points as point lights
+    int contributions = 0;
+    for (glm::vec3 rpoint : randomVectors) {
+        if (castShadow(intersectionPos, center + rpoint * r, bvh)) contributions++;
+    }
+
+    float coverage = contributions / randomVectors.size();  // calculate percentage of the light coverage
+    return coverage;
+}
 
 static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo) {
     glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
-
     glm::vec3 kd = hitInfo.material.kd;
-    float light_coefficient = 0;
+    float lightIntensity = 1.0f;
 
     //float count = 0;
     glm::vec3 diffuse{ 0 };
     glm::vec3 spec{ 0 };
-    for (PointLight const light : scene.pointLights) {
-        
-        if (castShadow(intersectPos, light, bvh)) { light_coefficient = 1; } // to illustrate hard shadows
-        glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
+    for (SphericalLight const slight : scene.sphericalLight) {
+        lightIntensity -= softShadow(intersectPos, slight, bvh);
+        glm::vec3 lightVec = glm::normalize(slight.position - intersectPos);
         glm::vec3 normal = glm::normalize(hitInfo.normal);
 
-        light_coefficient = light_coefficient / scene.pointLights.size();
+        lightIntensity = lightIntensity / scene.sphericalLight.size();
 
         float dot = glm::dot(normal, lightVec);
         if (dot > 0) {
-            diffuse = diffuse + (kd * light.color * dot);
+            diffuse = diffuse + (kd * slight.color * dot) * lightIntensity;
         }
 
         //count++;
-
         glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
         glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
 
         float dotprod = glm::dot(viewVec, reflectionVec);
         if (dotprod > 0) {
-            spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess));
+            spec = spec + (hitInfo.material.ks * slight.color * pow(dotprod, hitInfo.material.shininess)) * lightIntensity;
+        }
+    }
+
+    for (PointLight const light : scene.pointLights) {
+        if (!castShadow(intersectPos, light.position, bvh)) { lightIntensity = 1; }
+        glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
+        glm::vec3 normal = glm::normalize(hitInfo.normal);
+
+        lightIntensity = lightIntensity / scene.pointLights.size();
+        float dot = glm::dot(normal, lightVec);
+        if (dot > 0) {
+            diffuse = diffuse + (kd * light.color * dot) * lightIntensity;
+        }
+
+        //count++;
+        glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
+        glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
+
+        float dotprod = glm::dot(viewVec, reflectionVec);
+        if (dotprod > 0) {
+            spec = spec + (hitInfo.material.ks * light.color * pow(dotprod, hitInfo.material.shininess)) * lightIntensity;
         }
 
     }
     Ray rey{ intersectPos, hitInfo.normal, 1 };
     glm::vec3 res = diffuse + spec;
     //drawRay(rey, res);
-    return res*light_coefficient;
+    return res;
 }
 
 static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor) {
@@ -139,7 +178,7 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     HitInfo hitInfo;
     //return recursiveRayTracing(scene, bvh, ray, hitInfo);
     int level = 10;
-    
+
     if (bvh.intersect(ray, hitInfo)) {
         drawRay(ray);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
@@ -148,14 +187,15 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         else {
             return getFaceColour(scene, bvh, ray, hitInfo);
         }
-    } else {
+    }
+    else {
         // Draw a red debug ray if the ray missed.
         //drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
-    
-    
+
+
 }
 
 static void setOpenGLMatrices(const Trackball& camera);
@@ -170,7 +210,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
     for (int y = 0; y < windowResolution.y; y++) {
         for (int x = 0; x != windowResolution.x; x++) {
             // NOTE: (-1, -1) at the bottom left of the screen, (+1, +1) at the top right of the screen.
-            const glm::vec2 normalizedPixelPos {
+            const glm::vec2 normalizedPixelPos{
                 float(x) / windowResolution.x * 2.0f - 1.0f,
                 float(y) / windowResolution.y * 2.0f - 1.0f
             };
@@ -182,23 +222,24 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
 
 int main(int argc, char** argv)
 {
+    initialize(8);  // initialize random vectors with 8 samples
     Trackball::printHelp();
     std::cout << "\n Press the [R] key on your keyboard to create a ray towards the mouse cursor" << std::endl
-              << std::endl;
+        << std::endl;
 
-    Window window { "Final Project - Part 2", windowResolution, OpenGLVersion::GL2 };
-    Screen screen { windowResolution };
-    Trackball camera { &window, glm::radians(50.0f), 3.0f };
+    Window window{ "Final Project - Part 2", windowResolution, OpenGLVersion::GL2 };
+    Screen screen{ windowResolution };
+    Trackball camera{ &window, glm::radians(50.0f), 3.0f };
     camera.setCamera(glm::vec3(0.0f, 0.0f, 0.0f), glm::radians(glm::vec3(20.0f, 20.0f, 0.0f)), 3.0f);
 
-    SceneType sceneType { SceneType::SingleTriangle };
+    SceneType sceneType{ SceneType::SingleTriangle };
     std::optional<Ray> optDebugRay;
     Scene scene = loadScene(sceneType, dataPath);
-    BoundingVolumeHierarchy bvh { &scene };
+    BoundingVolumeHierarchy bvh{ &scene };
 
     int bvhDebugLevel = 0;
-    bool debugBVH { false };
-    ViewMode viewMode { ViewMode::Rasterization };
+    bool debugBVH{ false };
+    ViewMode viewMode{ ViewMode::Rasterization };
 
     window.registerKeyCallback([&](int key, int /* scancode */, int action, int /* mods */) {
         if (action == GLFW_PRESS) {
@@ -214,28 +255,28 @@ int main(int argc, char** argv)
             } break;
             };
         }
-    });
+        });
 
-    int selectedLight { 0 };
+    int selectedLight{ 0 };
     while (!window.shouldClose()) {
         window.updateInput();
 
         // === Setup the UI ===
         ImGui::Begin("Final Project - Part 2");
         {
-            constexpr std::array items { "SingleTriangle", "Cube", "Cornell Box (with mirror)", "Cornell Box (spherical light and mirror)", "Monkey", "Dragon", /* "AABBs",*/ "Spheres", /*"Mixed",*/ "Custom" };
+            constexpr std::array items{ "SingleTriangle", "Cube", "Cornell Box (with mirror)", "Cornell Box (spherical light and mirror)", "Monkey", "Dragon", /* "AABBs",*/ "Spheres", /*"Mixed",*/ "Custom" };
             if (ImGui::Combo("Scenes", reinterpret_cast<int*>(&sceneType), items.data(), int(items.size()))) {
                 optDebugRay.reset();
                 scene = loadScene(sceneType, dataPath);
                 bvh = BoundingVolumeHierarchy(&scene);
                 if (optDebugRay) {
-                    HitInfo dummy {};
+                    HitInfo dummy{};
                     bvh.intersect(*optDebugRay, dummy);
                 }
             }
         }
         {
-            constexpr std::array items { "Rasterization", "Ray Traced" };
+            constexpr std::array items{ "Rasterization", "Ray Traced" };
             ImGui::Combo("View mode", reinterpret_cast<int*>(&viewMode), items.data(), int(items.size()));
         }
         if (ImGui::Button("Render to file")) {
@@ -288,7 +329,8 @@ int main(int argc, char** argv)
                 if (selectedLight < static_cast<int>(scene.pointLights.size())) {
                     // Draw a big yellow sphere and then the small light sphere on top.
                     showLightOptions(scene.pointLights[selectedLight]);
-                } else {
+                }
+                else {
                     // Draw a big yellow sphere and then the smaller light sphere on top.
                     showLightOptions(scene.sphericalLight[selectedLight - scene.pointLights.size()]);
                 }
@@ -296,17 +338,18 @@ int main(int argc, char** argv)
         }
 
         if (ImGui::Button("Add point light")) {
-            scene.pointLights.push_back(PointLight { glm::vec3(0.0f), glm::vec3(1.0f) });
+            scene.pointLights.push_back(PointLight{ glm::vec3(0.0f), glm::vec3(1.0f) });
             selectedLight = int(scene.pointLights.size() - 1);
         }
         if (ImGui::Button("Add spherical light")) {
-            scene.sphericalLight.push_back(SphericalLight { glm::vec3(0.0f), 0.1f, glm::vec3(1.0f) });
+            scene.sphericalLight.push_back(SphericalLight{ glm::vec3(0.0f), 0.1f, glm::vec3(1.0f) });
             selectedLight = int(scene.pointLights.size() + scene.sphericalLight.size() - 1);
         }
         if (ImGui::Button("Remove selected light")) {
             if (selectedLight < static_cast<int>(scene.pointLights.size())) {
                 scene.pointLights.erase(std::begin(scene.pointLights) + selectedLight);
-            } else {
+            }
+            else {
                 scene.sphericalLight.erase(std::begin(scene.sphericalLight) + (selectedLight - scene.pointLights.size()));
             }
             selectedLight = 0;
@@ -405,7 +448,8 @@ static void renderOpenGL(const Scene& scene, const Trackball& camera, int select
             glDisable(GL_DEPTH_TEST);
             drawSphere(light.position, 0.01f, light.color);
             glEnable(GL_DEPTH_TEST);
-        } else {
+        }
+        else {
             // Draw a big yellow sphere and then the smaller light sphere on top.
             const auto& light = scene.sphericalLight[selectedLight - scene.pointLights.size()];
             drawSphere(light.position, light.radius + 0.01f, glm::vec3(1, 1, 0));
@@ -421,10 +465,10 @@ static void renderOpenGL(const Scene& scene, const Trackball& camera, int select
     int i = 0;
     const auto enableLight = [&](const auto& light) {
         glEnable(GL_LIGHT0 + i);
-        const glm::vec4 position4 { light.position, 1 };
+        const glm::vec4 position4{ light.position, 1 };
         glLightfv(GL_LIGHT0 + i, GL_POSITION, glm::value_ptr(position4));
-        const glm::vec4 color4 { glm::clamp(light.color, 0.0f, 1.0f), 1.0f };
-        const glm::vec4 zero4 { 0.0f, 0.0f, 0.0f, 1.0f };
+        const glm::vec4 color4{ glm::clamp(light.color, 0.0f, 1.0f), 1.0f };
+        const glm::vec4 zero4{ 0.0f, 0.0f, 0.0f, 1.0f };
         glLightfv(GL_LIGHT0 + i, GL_AMBIENT, glm::value_ptr(zero4));
         glLightfv(GL_LIGHT0 + i, GL_DIFFUSE, glm::value_ptr(color4));
         glLightfv(GL_LIGHT0 + i, GL_SPECULAR, glm::value_ptr(zero4));
