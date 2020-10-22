@@ -35,17 +35,68 @@ enum class ViewMode {
     RayTracing = 1
 };
 
+float r;
+std::vector<glm::vec3> random_points;
+
+void initialize() {
+    float r = 0.25;                                                 // radius of our light sphere
+    float samples = 8;                                              // # of random points (samples) inside our light sphere
+
+    for (int i = 0; i < samples; i++) {
+        float xr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
+        float yr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
+        float zr = ((2 * (float)rand()) / (float(RAND_MAX))) - 1;
+
+        glm::vec3 randomvector = (glm::vec3(xr * r, yr * r, zr * r));
+        random_points.push_back(randomvector);
+    }
+}
+
+// Hard Shadows
+// test if any object lies between hitpoint and lightsource
+bool castShadow(glm::vec3 vertexPos, PointLight lightsource, BoundingVolumeHierarchy bvh) {
+    float distance = glm::length(vertexPos - lightsource.position);
+    glm::vec3 destination = lightsource.position;
+    glm::vec3 origin = vertexPos;
+    glm::vec3 direction = glm::normalize(destination - origin);
+
+    Ray shadowray;
+    shadowray.origin = origin;
+    shadowray.direction = direction;
+    shadowray.t = INFINITY;
+
+    // now here we shoot our ray but nobody knows how ???
+    HitInfo h;
+    bool intersects = bvh.intersect(shadowray, h);
+    if (!(distance < shadowray.t)) {
+        drawRay(shadowray, glm::vec3{ 1.0f, 0 ,0 }); // draw a debug ray
+        return false; 
+    }
+    drawRay(shadowray, glm::vec3{ 0.0f, 1.0f ,0 }); // draw a debug ray
+    return (distance < shadowray.t);
+}
+
+
 static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo) {
     glm::vec3 intersectPos = ray.origin + ray.direction * ray.t;
+
+    glm::vec3 kd = hitInfo.material.kd;
+    float light_coefficient = 0;
+
     //float count = 0;
     glm::vec3 diffuse{ 0 };
     glm::vec3 spec{ 0 };
     for (PointLight const light : scene.pointLights) {
+        
+        if (castShadow(intersectPos, light, bvh)) { light_coefficient = 1; } // to illustrate hard shadows
         glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
         glm::vec3 normal = glm::normalize(hitInfo.normal);
+
+        light_coefficient = light_coefficient / scene.pointLights.size();
+
         float dot = glm::dot(normal, lightVec);
         if (dot > 0) {
-            diffuse = diffuse + (hitInfo.material.kd * light.color * dot);
+            diffuse = diffuse + (kd * light.color * dot);
         }
 
         //count++;
@@ -62,7 +113,7 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     Ray rey{ intersectPos, hitInfo.normal, 1 };
     glm::vec3 res = diffuse + spec;
     //drawRay(rey, res);
-    return res;
+    return res*light_coefficient;
 }
 
 static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor) {
