@@ -159,12 +159,12 @@ void shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, std::vector<Mesh
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);// , box.lower, box.upper);
         AxisAlignedBox box2 = setBox(secondSet, mesh);// , box.lower, box.upper);
-        shrinkBox(box1, firstSet, mesh, 0, level++);
-        shrinkBox(box2, secondSet, mesh, 0, level++);
+        shrinkBox(box1, firstSet, mesh, 1, level + 1);
+        shrinkBox(box2, secondSet, mesh, 1, level + 1);
 
 
     }
-    /*else if (axis == 1) {
+    else if (axis == 1) {
         CustomCompY compY = CustomCompY(mesh.front());
         std::priority_queue<Triangle, std::vector<Triangle>, CustomCompY> queue(compY);
 
@@ -196,8 +196,8 @@ void shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, std::vector<Mesh
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
         AxisAlignedBox box2 = setBox(secondSet, mesh); 
-        shrinkBox(box1, firstSet, mesh, 2, level++);
-        shrinkBox(box2, secondSet, mesh, 2, level++);
+        shrinkBox(box1, firstSet, mesh, 2, level + 1);
+        shrinkBox(box2, secondSet, mesh, 2, level + 1);
     }
 
     else if (axis == 2) {
@@ -232,9 +232,9 @@ void shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, std::vector<Mesh
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
         AxisAlignedBox box2 = setBox(secondSet, mesh);
-        shrinkBox(box1, firstSet, mesh, 0, level++);
-        shrinkBox(box2, secondSet, mesh, 0, level++);
-    }*/
+        shrinkBox(box1, firstSet, mesh, 0, level + 1);
+        shrinkBox(box2, secondSet, mesh, 0, level + 1);
+    }
     else {
         std::cout << "There is a problem lmao" << std::endl;
     }
