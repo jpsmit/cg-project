@@ -1,31 +1,53 @@
 #include "bounding_volume_hierarchy.h"
 #include "draw.h"
-#include "queue"
+#include "CustomCompX.cpp"
+#include "CustomCompY.cpp"
+#include "CustomCompZ.cpp"
 #include <cmath>
-#include <glm/geometric.hpp>
-#include <glm/gtx/component_wise.hpp>
-#include <glm/vector_relational.hpp>
+#include <glm\common.hpp>
+#include <queue>
+#include <iostream>
 
-class CustomCompX {
-    std::vector<Vertex> vertices;
-
-    CustomCompX(std::vector<Vertex> vertices) {
-        vertices = vertices;
+AxisAlignedBox setBox(std::vector<Triangle> triangles, std::vector<Mesh> meshes) {
+    glm::vec3 minPos = glm::vec3{ std::numeric_limits<float>::max() };
+    glm::vec3 maxPos = glm::vec3{ -std::numeric_limits<float>::min() };
+    for (const Mesh mesh : meshes) {
+        for (const Triangle tri : triangles) {
+            for (int i = 0; i < 3; i++) {
+                if (mesh.vertices[tri[i]].p.x < minPos.x) {
+                    minPos.x = mesh.vertices[tri[i]].p.x;
+                }
+                if (mesh.vertices[tri[i]].p.y < minPos.y) {
+                    minPos.y = mesh.vertices[tri[i]].p.y;
+                }
+                if (mesh.vertices[tri[i]].p.z < minPos.z) {
+                    minPos.z = mesh.vertices[tri[i]].p.z;
+                }
+                if (mesh.vertices[tri[i]].p.x > maxPos.x) {
+                    maxPos.x = mesh.vertices[tri[i]].p.x;
+                }
+                if (mesh.vertices[tri[i]].p.y > maxPos.y) {
+                    maxPos.y = mesh.vertices[tri[i]].p.y;
+                }
+                if (mesh.vertices[tri[i]].p.z > maxPos.z) {
+                    maxPos.z = mesh.vertices[tri[i]].p.z;
+                }
+            }
+            
+        }
     }
+    
 
-    bool operator() (Mesh mesh, Triangle t1, Triangle t2) const {
-        const auto v1 = glm::min(glm::min(mesh.vertices[t1[0]].p.x, mesh.vertices[t1[1]].p.x), mesh.vertices[t1[2]].p.x);
-        const auto v2 = glm::min(glm::min(mesh.vertices[t2[0]].p.x, mesh.vertices[t2[1]].p.x), mesh.vertices[t2[2]].p.x);
-        return v1 > v2;
-    }
-};
+    AxisAlignedBox box{ minPos, maxPos };
+    return box;
+}
 
-AxisAlignedBox setBox(Scene* pScene,glm::vec3 min, glm::vec3 max) {
-    glm::vec3 minPos = min;
-    glm::vec3 maxPos = max;
+AxisAlignedBox largestBoxSize(Scene* pScene) {
+    glm::vec3 minPos = glm::vec3{ std::numeric_limits<float>::max() };
+    glm::vec3 maxPos = glm::vec3{ -std::numeric_limits<float>::min() };
     for (const auto& mesh : pScene->meshes) {
         for (const auto& tri : mesh.vertices) {
-            if (tri.p.x < minPos.x ) {
+            if (tri.p.x < minPos.x) {
                 minPos.x = tri.p.x;
             }
             if (tri.p.y < minPos.y) {
@@ -48,12 +70,22 @@ AxisAlignedBox setBox(Scene* pScene,glm::vec3 min, glm::vec3 max) {
 
     AxisAlignedBox box{ minPos, maxPos };
     return box;
+    //return setBox(pScene, glm::vec3{ std::numeric_limits<float>::max() }, glm::vec3{ -std::numeric_limits<float>::max() });
 }
 
-AxisAlignedBox largestBoxSize(Scene* pScene) {
-    return setBox(pScene, glm::vec3{ std::numeric_limits<float>::max() }, glm::vec3{ -std::numeric_limits<float>::max() });
+std::vector<Triangle> getTriangles(Scene* scene) {
+    std::vector<Triangle> res = {};
+    /*for (const auto& mesh : m_pScene->meshes) {
+        for (const auto& tri : mesh.triangles) {
+        }
+    }*/
+    for (const auto& mesh : scene->meshes) {
+        for (const auto& tri : mesh.triangles) {
+            res.push_back(tri);
+        }
+    }
+    return res;
 }
-
 
 /* 
 *  recursive step that splits the bounding box to be smaller
@@ -64,50 +96,158 @@ AxisAlignedBox largestBoxSize(Scene* pScene) {
 * level is the level of the bvh that we have split to. max is 5, it will not go beyond that.
 */
 
-void shrinkBox(AxisAlignedBox box, Scene scene, bool axis, bool direction, int level) {
-    
-    if (axis) {
-        std::priority_queue<Triangle, std::vector<float>, CustomCompX> queue;
-        int count = 0;
-        for (const auto& mesh : scene.meshes) {
-            for (const auto& tri : mesh.triangles) {
-                if (axis) {
-                    float x = mesh.vertices[tri[0]].p.x;
-                    queue.push(tri);
+void shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, std::vector<Mesh> mesh, int axis, int level) {
+    if (level > 1 ) {
+        return;
+    }
 
-                }
-                else {
-                    queue.push(tri);
-                }
-                count++;
+    /*if (axis) {
+        AxisAlignedBox box1 = setBox(scene, box.lower, glm::vec3{ box.upper.x / 2.0f, box.upper.y, box.upper.z });
+        AxisAlignedBox box2 = setBox(scene, glm::vec3{ box.lower.x/2.0f, box.lower.y, box.lower.z }, box.upper);
+        shrinkBox(box1, scene, !axis, level + 1);
+        shrinkBox(box2, scene, !axis, level + 1);
+    }
+
+    else {
+        AxisAlignedBox box1 = setBox(scene, box.lower, glm::vec3{ box.upper.x , box.upper.y*0.5f, box.upper.z });
+        AxisAlignedBox box2 = setBox(scene, glm::vec3{ box.lower.x, box.lower.y*0.5f, box.lower.z }, box.upper);
+        shrinkBox(box1, scene, !axis, level + 1);
+        shrinkBox(box2, scene, !axis, level + 1);
+    }*/
+    
+    if (axis == 0) {
+        CustomCompX compX = CustomCompX(mesh.front());
+        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompX> queue (compX);
+        //ree queue(CustomCompX);
+        //    CustomCompX.setMesh(mesh.front());
+        int count = 0;
+        for (const auto& tri : scene) {
+            if (axis) {
+                //float x = tri[0].p.x;
+                queue.push(tri);
+
             }
+            else {
+                queue.push(tri);
+            }
+            count++;
         }
 
         int median = count / 2;
-        if (count % 2 != 0) {
-            if (direction) {
-                median++;
-            }
-        }
 
-        std::vector<Triangle> triangles = {};
+        std::vector<Triangle> firstSet = {};
         for (int i = 0; i < median; i++) {
-            Triangle tri = queue.pop;
-            triangles.insert(tri);
+            firstSet.push_back(queue.top());
+            queue.pop();
         }
 
-        Triangle tri{};
-        //mesh.vertices[tri[0]].;
+        std::vector<Triangle> secondSet = {};
+        while (!queue.empty()) {
+            secondSet.push_back(queue.top());
+            queue.pop();
+        }
+
+        /*std::vector<glm::vec3> test = {};    //these are only here to debug
+        for (const Triangle vert : firstSet) {
+            test.push_back((mesh.front().vertices[vert[0]].p + mesh.front().vertices[vert[1]].p + mesh.front().vertices[vert[2]].p)/3.0f);
+        }
+
+        std::vector<glm::vec3> test2 = {};
+        for (const Triangle vert : secondSet) {
+            test2.push_back((mesh.front().vertices[vert[0]].p + mesh.front().vertices[vert[1]].p + mesh.front().vertices[vert[2]].p) / 3.0f);
+        }*/
+
+        AxisAlignedBox box1 = setBox(firstSet, mesh);// , box.lower, box.upper);
+        AxisAlignedBox box2 = setBox(secondSet, mesh);// , box.lower, box.upper);
+        shrinkBox(box1, firstSet, mesh, 0, level++);
+        shrinkBox(box2, secondSet, mesh, 0, level++);
+
 
     }
-    
+    /*else if (axis == 1) {
+        CustomCompY compY = CustomCompY(mesh.front());
+        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompY> queue(compY);
+
+        int count = 0;
+        for (const auto& tri : scene) {
+            if (axis) {
+                queue.push(tri);
+
+            }
+            else {
+                queue.push(tri);
+            }
+            count++;
+        }
+
+        int median = count / 2;
+
+        std::vector<Triangle> firstSet = {};
+        for (int i = 0; i < median; i++) {
+            firstSet.push_back(queue.top());
+            queue.pop();
+        }
+
+        std::vector<Triangle> secondSet = {};
+        while (!queue.empty()) {
+            secondSet.push_back(queue.top());
+            queue.pop();
+        }
+
+        AxisAlignedBox box1 = setBox(firstSet, mesh);
+        AxisAlignedBox box2 = setBox(secondSet, mesh); 
+        shrinkBox(box1, firstSet, mesh, 2, level++);
+        shrinkBox(box2, secondSet, mesh, 2, level++);
+    }
+
+    else if (axis == 2) {
+        CustomCompZ compZ = CustomCompZ(mesh.front());
+        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompZ> queue(compZ);
+
+        int count = 0;
+        for (const auto& tri : scene) {
+            if (axis) {
+                queue.push(tri);
+
+            }
+            else {
+                queue.push(tri);
+            }
+            count++;
+        }
+
+        int median = count / 2;
+
+        std::vector<Triangle> firstSet = {};
+        for (int i = 0; i < median; i++) {
+            firstSet.push_back(queue.top());
+            queue.pop();
+        }
+
+        std::vector<Triangle> secondSet = {};
+        while (!queue.empty()) {
+            secondSet.push_back(queue.top());
+            queue.pop();
+        }
+
+        AxisAlignedBox box1 = setBox(firstSet, mesh);
+        AxisAlignedBox box2 = setBox(secondSet, mesh);
+        shrinkBox(box1, firstSet, mesh, 0, level++);
+        shrinkBox(box2, secondSet, mesh, 0, level++);
+    }*/
+    else {
+        std::cout << "There is a problem lmao" << std::endl;
+    }
 }
 
 
 BoundingVolumeHierarchy::BoundingVolumeHierarchy(Scene* pScene)
     : m_pScene(pScene)
 {
-    largestBoxSize(pScene);
+    AxisAlignedBox overallBox = largestBoxSize(pScene);
+    std::vector<Triangle> totalTriangles = getTriangles(pScene);
+    shrinkBox(overallBox, totalTriangles, pScene->meshes, 0, 0);
+
     // as an example of how to iterate over all meshes in the scene, look at the intersect method below
 }
 
@@ -122,13 +262,23 @@ void BoundingVolumeHierarchy::debugDraw(int level)
     // Draw the AABB as a transparent green box.
     //AxisAlignedBox aabb{ glm::vec3(-0.05f), glm::vec3(0.05f, 1.05f, 1.05f) };
     //drawShape(aabb, DrawMode::Filled, glm::vec3(0.0f, 1.0f, 0.0f), 0.2f);
-
+    BoundingVolumeHierarchy::numLevels();
     // Draw the AABB as a (white) wireframe box.
     AxisAlignedBox aabb { glm::vec3(-.85f, -0.65f, -0.33f), glm::vec3(0.85f, 0.57f, 0.725f) };
     //drawAABB(aabb, DrawMode::Wireframe);
 
-    drawAABB(aabb, DrawMode::Filled, glm::vec3(0.05f, 1.0f, 0.05f), 0.1);
+    /*AxisAlignedBox layer11{ glm::vec3(-.85f, -0.65f, -0.33f), glm::vec3(0.45f, 0.57f, 0.725f) };
+    AxisAlignedBox layer12{ glm::vec3(-0.515f, -0.65f, -0.33f), glm::vec3(0.85f, 0.57f, 0.725f) };*/
 
+    AxisAlignedBox layer11{ glm::vec3(-.85f, -0.65f, -0.23f), glm::vec3(0.85f, 0.57f, 0.725f) };
+    AxisAlignedBox layer12{ glm::vec3(-0.534f, -0.65f, -0.33f), glm::vec3(0.534f, 0.433f, 0.0f) };
+    AxisAlignedBox check{ glm::vec3(-.75f, -.55f, -0.170370504), glm::vec3(0.75f, 0.47f, 0.0f) };
+
+
+    //drawAABB(aabb, DrawMode::Filled, glm::vec3(0.05f, 1.0f, 0.05f), 0.1);
+    drawAABB(layer11, DrawMode::Wireframe);
+    drawAABB(layer12, DrawMode::Wireframe);
+    drawAABB(check, DrawMode::Wireframe);
 
 }
 
