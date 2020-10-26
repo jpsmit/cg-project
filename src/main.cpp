@@ -63,7 +63,7 @@ bool castShadow(glm::vec3 vertexPos, glm::vec3 lightsource, BoundingVolumeHierar
     glm::vec3 direction = glm::normalize(destination - origin);
 
     Ray shadowray;
-    shadowray.origin = origin;
+    shadowray.origin = origin+direction*0.00001f;
     shadowray.direction = direction;
     shadowray.t = INFINITY;
 
@@ -89,12 +89,14 @@ float softShadow(glm::vec3 intersectionPos, SphericalLight sphericalLight, const
         if (castShadow(intersectionPos, center, bvh)) return 1;              // If in shadow skip further computation for this lightsource
     }
     // we generate random points as point lights
-    int contributions = 0;
-    for (glm::vec3 rpoint : randomVectors) {
-        if (castShadow(intersectionPos, center + rpoint * r, bvh)) contributions++;
+    float contributions = 0;
+    for (int i = 0; i < randomVectors.size(); i++) {
+        if (castShadow(intersectionPos, center + randomVectors[i] * r, bvh)) {
+            contributions++;
+        }
     }
 
-    float coverage = contributions / randomVectors.size();  // calculate percentage of the light coverage
+    float coverage = (contributions / randomVectors.size());  // calculate percentage of the light coverage
     return coverage;
 }
 
