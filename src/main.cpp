@@ -89,7 +89,7 @@ float softShadow(glm::vec3 intersectionPos, SphericalLight sphericalLight, const
         if (castShadow(intersectionPos, center, bvh)) return 1;              // If in shadow skip further computation for this lightsource
     }
     // we generate random points as point lights
-    int contributions = 0;
+    float contributions = 0.0f;
     for (glm::vec3 rpoint : randomVectors) {
         if (castShadow(intersectionPos, center + rpoint * r, bvh)) contributions++;
     }
