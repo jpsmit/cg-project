@@ -26,7 +26,7 @@ DISABLE_WARNINGS_POP()
 #endif
 
 // This is the main application. The code in here does not need to be modified.
-constexpr glm::ivec2 windowResolution{ 800, 800 };
+constexpr glm::ivec2 windowResolution{ 1200, 960 };
 const std::filesystem::path dataPath{ DATA_DIR };
 const std::filesystem::path outputPath{ OUTPUT_DIR };
 
@@ -155,20 +155,70 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     return res;
 }
 
-static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor) {
+void drawSquare(double x1, double y1, double sidelength)
+{
+    double halfside = sidelength / 2;
+
+    glColor3d(0, 0, 0);
+    glBegin(GL_POLYGON);
+
+    glVertex2d(x1 + halfside, y1 + halfside);
+    glVertex2d(x1 + halfside, y1 - halfside);
+    glVertex2d(x1 - halfside, y1 - halfside);
+    glVertex2d(x1 - halfside, y1 + halfside);
+
+    glEnd();
+}
+
+static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHierarchy& bvh, Ray ray, HitInfo hitInfo, int level, int maxLevel, glm::vec3 hitColor, bool glossy) {
     Ray reflect = calculateReflectionRay(ray, hitInfo);
-    Ray prev = reflect;
-    HitInfo prevHit = hitInfo;
-    if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
-        drawRay(reflect);
-        if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo));
+
+    if (glossy) {
+        float dot = glm::dot(hitInfo.normal, (reflect.direction - reflect.origin));
+        float angle = glm::degrees(glm::acos(dot));
+
+        //glm::rotate(, reflect.direction, angle);
+        float samples = 8;
+        glm::vec3 basedirection = reflect.direction;
+        glm::vec3 finalColor = glm::vec3{ 0.0f };
+        int hit = 0;
+        for (int i = 0; i < samples; i++) {
+            reflect.direction = basedirection + (randomVectors[i] * 0.04f);
+            reflect.t = 1000.0f;
+            if (bvh.intersect(reflect, hitInfo)) {
+                hit++;
+                drawRay(reflect);
+                if (hitInfo.material.ks != glm::vec3{ 0.0f } && hitInfo.material.ks.x < 0.9f)
+                {
+                    finalColor+= recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo), true);
+                }
+                else {
+                    finalColor += getFaceColour(scene, bvh, ray, hitInfo);
+                }
+            }
+         
         }
+        finalColor = glm::vec3{ finalColor.x / hit, finalColor.y / hit, finalColor.z / hit };
+        return finalColor;
+      
     }
     else {
-        drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
-        return hitColor;
+        Ray prev = reflect;
+        if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
+            drawRay(reflect);
+            //Perfect mirror
+
+            if (hitInfo.material.ks != glm::vec3{ 0 } && hitInfo.material.ks.x > 0.9) {
+                return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo), false);
+            }
+
+        }
+        else {
+            drawRay(prev, glm::vec3{ 1.0f, 0 ,0 });
+            return hitColor;
+        }
     }
+    
     return hitColor + getFaceColour(scene, bvh, ray, hitInfo);
 }
 
@@ -181,9 +231,16 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 
     if (bvh.intersect(ray, hitInfo)) {
         drawRay(ray);
-        if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd);
+        //Glossy reflection
+        if (hitInfo.material.ks != glm::vec3{ 0 } && hitInfo.material.ks.x < 0.9) {
+            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd, true);
         }
+        else if (hitInfo.material.ks != glm::vec3{ 0 } && hitInfo.material.ks.x > 0.9) {
+            // NOTE(Jurriaan): Cornell box has default 100% reflection, so if you want the mirror to acts as a
+// glossy or diffuse surface to test glossy reflection, set the true variable to true so it will treat as diffuse/glossy
+            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd, false);
+        }
+        
         else {
             return getFaceColour(scene, bvh, ray, hitInfo);
         }
@@ -204,9 +261,13 @@ static void renderOpenGL(const Scene& scene, const Trackball& camera, int select
 // This is the main rendering function. You are free to change this function in any way (including the function signature).
 static void renderRayTracing(const Scene& scene, const Trackball& camera, const BoundingVolumeHierarchy& bvh, Screen& screen)
 {
+
 #ifdef USE_OPENMP
 #pragma omp parallel for
 #endif
+    
+
+
     for (int y = 0; y < windowResolution.y; y++) {
         for (int x = 0; x != windowResolution.x; x++) {
             // NOTE: (-1, -1) at the bottom left of the screen, (+1, +1) at the top right of the screen.
@@ -218,6 +279,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
             screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
         }
     }
+
 }
 
 int main(int argc, char** argv)
@@ -226,7 +288,6 @@ int main(int argc, char** argv)
     Trackball::printHelp();
     std::cout << "\n Press the [R] key on your keyboard to create a ray towards the mouse cursor" << std::endl
         << std::endl;
-
     Window window{ "Final Project - Part 2", windowResolution, OpenGLVersion::GL2 };
     Screen screen{ windowResolution };
     Trackball camera{ &window, glm::radians(50.0f), 3.0f };
@@ -442,7 +503,7 @@ static void renderOpenGL(const Scene& scene, const Trackball& camera, int select
 
     if (!scene.pointLights.empty() || !scene.sphericalLight.empty()) {
         if (selectedLight < static_cast<int>(scene.pointLights.size())) {
-            // Draw a big yellow sphere and then the small light sphere on top.
+            // Draw     a big yellow sphere and then the small light sphere on top.
             const auto& light = scene.pointLights[selectedLight];
             drawSphere(light.position, 0.05f, glm::vec3(1, 1, 0));
             glDisable(GL_DEPTH_TEST);
