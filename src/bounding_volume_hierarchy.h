@@ -13,6 +13,8 @@ public:
         int level = 0;
         std::vector<Node> children {};
         bool leafNode = true;
+        Mesh mesh;
+        std::vector<Triangle> triangles;
     };
 
     void debugDraw(int level);

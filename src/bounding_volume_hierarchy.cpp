@@ -105,14 +105,14 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
     //Stopping the algorithm if the scene becomes empty, or the maximum level is reached.
     if (scene.size() == 0) {
         std::vector<BoundingVolumeHierarchy::Node> children {};
-        BoundingVolumeHierarchy::Node node{ AxisAlignedBox{ glm::vec3{0}, glm::vec3{0} }, level, children, true };
+        BoundingVolumeHierarchy::Node node{ AxisAlignedBox{ glm::vec3{0}, glm::vec3{0} }, level, children, true, mesh, scene };
         nodes.push_back(node);
         return node;
     }
     else if (scene.size() == 1 || level > 10) {
         AxisAlignedBox box = setBox(scene, mesh);
         std::vector<BoundingVolumeHierarchy::Node> children{};
-        BoundingVolumeHierarchy::Node node{ box, level, children, true };
+        BoundingVolumeHierarchy::Node node{ box, level, children, true, mesh, scene };
         nodes.push_back(node);
         return node;
     }
