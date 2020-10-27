@@ -33,7 +33,7 @@ const std::filesystem::path outputPath{ OUTPUT_DIR };
 std::random_device rd;                                  // NOTE: (Jean-Paul) These imports are essential for random point generation
 std::mt19937 gen(rd());                                 // https://stackoverflow.com/questions/9878965/rand-between-0-and-1
 std::uniform_real_distribution<> dis(-1, 1);
-
+glm::vec3 pixels[windowResolution.y][windowResolution.x];
 enum class ViewMode {
     Rasterization = 0,
     RayTracing = 1
@@ -276,8 +276,34 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 float(y) / windowResolution.y * 2.0f - 1.0f
             };
             const Ray cameraRay = camera.generateRay(normalizedPixelPos);
-            screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
+            glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
+            //screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
+            pixels[y][x] = col;
         }
+
+        Screen screenAA = Screen{ windowResolution / 2 };
+        int xO = 0;
+        int yO = 0;
+        yO = 0;
+
+        for (int y = 0; y < windowResolution.y / 2; y++) {
+            xO = 0;
+            for (int x = 0; x != windowResolution.x / 2; x++) {
+                glm::vec3 color = glm::vec3{ 0.0f };
+                if ((yO + 1) < windowResolution.x && (xO + 1) < windowResolution.y) {
+                    color = pixels[yO][xO] + pixels[yO][xO + 1] + pixels[yO + 1][xO] + pixels[yO + 1][xO + 1];
+                    color = glm::vec3(color.x / 4, color.y / 4, color.z / 4);
+                    screenAA.setPixel(x, y, color);
+                    xO += 2;
+                }
+            }
+            yO += 2;
+
+        }
+
+
+        screen.clear(glm::vec3{ 1.0f });
+        screen = screenAA;
     }
 
 }
