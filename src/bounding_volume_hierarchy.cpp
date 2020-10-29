@@ -7,8 +7,10 @@
 #include <glm\common.hpp>
 #include <queue>
 #include <iostream>
+#include <queue>
 
 std::vector<BoundingVolumeHierarchy::Node> nodes;
+std::vector<BoundingVolumeHierarchy::Node> rootNodes;
 
 /*Sets the size of the AxisAlignedBox that will be created, which surrounds the given triangles for a specific mesh.
 * triangles is a vector with all the triangles that will be considered for this bounding box
@@ -106,10 +108,10 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
     if (scene.size() == 0) {
         std::vector<BoundingVolumeHierarchy::Node> children {};
         BoundingVolumeHierarchy::Node node{ AxisAlignedBox{ glm::vec3{0}, glm::vec3{0} }, level, children, true, mesh, scene };
-        nodes.push_back(node);
+        //nodes.push_back(node);
         return node;
     }
-    else if (scene.size() == 1 || level > 10) {
+    else if (scene.size() == 1 || level > 6) {
         AxisAlignedBox box = setBox(scene, mesh);
         std::vector<BoundingVolumeHierarchy::Node> children{};
         BoundingVolumeHierarchy::Node node{ box, level, children, true, mesh, scene };
@@ -117,33 +119,20 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
         return node;
     }
     
-    // splitting among the X axis
+    // splitting along the X axis
     if (axis == 0) {
         CustomCompX compX = CustomCompX(mesh);
-        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompX> queue (compX);;
-        int count = 0;
-        for (const auto& tri : scene) {
-            if (axis) {
-                queue.push(tri);
-            }
-            else {
-                queue.push(tri);
-            }
-            count++;
+        std::sort(scene.begin(), scene.end(), compX);
+
+        std::vector<Triangle> firstSet {};
+        std::vector<Triangle> secondSet{};
+
+        for (int i = 0; i < scene.size() / 2; i++) {
+            firstSet.push_back(scene[i]);
         }
 
-        int median = count / 2;
-
-        std::vector<Triangle> firstSet = {};
-        for (int i = 0; i < median; i++) {
-            firstSet.push_back(queue.top());
-            queue.pop();
-        }
-
-        std::vector<Triangle> secondSet = {};
-        while (!queue.empty()) {
-            secondSet.push_back(queue.top());
-            queue.pop();
+        for (int i = scene.size() / 2; i < scene.size(); i++) {
+            secondSet.push_back(scene[i]);
         }
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
@@ -151,7 +140,7 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
 
         BoundingVolumeHierarchy::Node node1 = shrinkBox(box1, firstSet, mesh, 1, level + 1);
         BoundingVolumeHierarchy::Node node2 = shrinkBox(box2, secondSet, mesh, 1, level + 1);
-        std::vector<BoundingVolumeHierarchy::Node> children{node1, node2};
+        std::vector<BoundingVolumeHierarchy::Node> children{ node1 , node2};
         BoundingVolumeHierarchy::Node currentNode{ box, level, children, false };
         nodes.push_back(currentNode);
         return currentNode;
@@ -162,32 +151,17 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
     // Splitting along the Y axis
     else if (axis == 1) {
         CustomCompY compY = CustomCompY(mesh);
-        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompY> queue(compY);
+        std::sort(scene.begin(), scene.end(), compY);
 
-        int count = 0;
-        for (const auto& tri : scene) {
-            if (axis) {
-                queue.push(tri);
+        std::vector<Triangle> firstSet{};
+        std::vector<Triangle> secondSet{};
 
-            }
-            else {
-                queue.push(tri);
-            }
-            count++;
+        for (int i = 0; i < scene.size() / 2; i++) {
+            firstSet.push_back(scene[i]);
         }
 
-        int median = count / 2;
-
-        std::vector<Triangle> firstSet = {};
-        for (int i = 0; i < median; i++) {
-            firstSet.push_back(queue.top());
-            queue.pop();
-        }
-
-        std::vector<Triangle> secondSet = {};
-        while (!queue.empty()) {
-            secondSet.push_back(queue.top());
-            queue.pop();
+        for (int i = scene.size() / 2 ; i < scene.size(); i++) {
+            secondSet.push_back(scene[i]);
         }
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
@@ -195,6 +169,7 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
         BoundingVolumeHierarchy::Node node1 = shrinkBox(box1, firstSet, mesh, 2, level + 1);
         BoundingVolumeHierarchy::Node node2 = shrinkBox(box2, secondSet, mesh, 2, level + 1);
         std::vector<BoundingVolumeHierarchy::Node> children{ node1, node2 };
+
         BoundingVolumeHierarchy::Node currentNode{ box, level, children, false };
         nodes.push_back(currentNode);
         return currentNode;
@@ -204,32 +179,17 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
     //Splitting along the Z axis - the only difference between the 3 axes are the custom comparator and what the next axis which will be split will be
     else if (axis == 2) {
         CustomCompZ compZ = CustomCompZ(mesh);
-        std::priority_queue<Triangle, std::vector<Triangle>, CustomCompZ> queue(compZ);
+        std::sort(scene.begin(), scene.end(), compZ);
 
-        int count = 0;
-        for (const auto& tri : scene) {
-            if (axis) {
-                queue.push(tri);
+        std::vector<Triangle> firstSet{};
+        std::vector<Triangle> secondSet{};
 
-            }
-            else {
-                queue.push(tri);
-            }
-            count++;
+        for (int i = 0; i < scene.size() / 2; i++) {
+            firstSet.push_back(scene[i]);
         }
 
-        int median = count / 2;
-
-        std::vector<Triangle> firstSet = {};
-        for (int i = 0; i < median; i++) {
-            firstSet.push_back(queue.top());
-            queue.pop();
-        }
-
-        std::vector<Triangle> secondSet = {};
-        while (!queue.empty()) {
-            secondSet.push_back(queue.top());
-            queue.pop();
+        for (int i = scene.size() / 2; i < scene.size(); i++) {
+            secondSet.push_back(scene[i]);
         }
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
@@ -254,10 +214,12 @@ BoundingVolumeHierarchy::BoundingVolumeHierarchy(Scene* pScene)
     : m_pScene(pScene)
 {
     nodes = {};
+    rootNodes = {};
     for (Mesh mesh : pScene->meshes) {
         AxisAlignedBox overallBox = largestBoxSize(pScene);
         std::vector<Triangle> totalTriangles = getTriangles(mesh);
-        shrinkBox(overallBox, totalTriangles, mesh, 0, 0);
+        BoundingVolumeHierarchy::Node root = shrinkBox(overallBox, totalTriangles, mesh, 0, 0);
+        rootNodes.push_back(root);
     }
     
 
@@ -273,41 +235,98 @@ void BoundingVolumeHierarchy::debugDraw(int level)
 {
 
     int newLevel = BoundingVolumeHierarchy::numLevels();
-    for (Node node : nodes) {
-        if (node.level == level) {
-            drawAABB(node.box, DrawMode::Wireframe);
+    for (int i = 0; i < nodes.size(); i++) {
+        if (nodes[i].level == level) {
+            drawAABB(nodes[i].box, DrawMode::Wireframe);
         }
     }
 }
 
 int BoundingVolumeHierarchy::numLevels() const
 {
-    return 11;
+    return 7;
+}
+
+bool intersectRayWithShapeNoChange(const AxisAlignedBox& box, Ray& ray)
+{
+    float tinX = glm::min(((box.lower.x - ray.origin.x) / ray.direction.x), ((box.upper.x - ray.origin.x) / ray.direction.x));
+    float tOutX = glm::max(((box.lower.x - ray.origin.x) / ray.direction.x), ((box.upper.x - ray.origin.x) / ray.direction.x));
+    float tinY = glm::min(((box.lower.y - ray.origin.y) / ray.direction.y), ((box.upper.y - ray.origin.y) / ray.direction.y));
+    float tOutY = glm::max(((box.lower.y - ray.origin.y) / ray.direction.y), ((box.upper.y - ray.origin.y) / ray.direction.y));
+    float tinZ = glm::min(((box.lower.z - ray.origin.z) / ray.direction.z), ((box.upper.z - ray.origin.z) / ray.direction.z));
+    float tOutZ = glm::max(((box.lower.z - ray.origin.z) / ray.direction.z), ((box.upper.z - ray.origin.z) / ray.direction.z));
+
+    float tin = glm::max(tinX, glm::max(tinY, tinZ));
+    float tout = glm::min(tOutX, glm::min(tOutY, tOutZ));
+
+    if (tin > tout || tout < 0) {
+        return false;
+    }
+
+    /*if (tin < ray.t) {
+        ray.t = tin;
+    }*/
+
+    return true;
 }
 
 // Return true if something is hit, returns false otherwise. Only find hits if they are closer than t stored
 // in the ray and if the intersection is on the correct side of the origin (the new t >= 0). Replace the code
 // by a bounding volume hierarchy acceleration structure as described in the assignment. You can change any
-// file you like, including bounding_volume_hierarchy.h .
 bool BoundingVolumeHierarchy::intersect(Ray& ray, HitInfo& hitInfo) const
 {
     bool hit = false;
+    //Ray minRay = ray;
     Ray minRay = ray;
-    // Intersect with all triangles of all meshes.
-    for (const auto& mesh : m_pScene->meshes) {
-        for (const auto& tri : mesh.triangles) {
-            const auto v0 = mesh.vertices[tri[0]];
-            const auto v1 = mesh.vertices[tri[1]];
-            const auto v2 = mesh.vertices[tri[2]];
-            if (intersectRayWithTriangle(v0.p, v1.p, v2.p, minRay, hitInfo)) {
-                if (minRay.t < ray.t) {
-                    ray.t = minRay.t;
-                    hitInfo.material = mesh.material;
-                    hit = true;
+
+    for (const auto& node : rootNodes) {
+
+        if (intersectRayWithShapeNoChange(node.box, minRay)) {
+
+            std::queue<Node> queue;
+            queue.push(node);
+
+            std::vector<Node> leafNodes{};
+
+            while (!queue.empty()) {
+                Node current = queue.front();
+                queue.pop();
+
+                if (current.leafNode) {
+                    leafNodes.push_back(current);
+                    continue;
+                }
+
+                if (intersectRayWithShapeNoChange(current.children[0].box, minRay)) {
+                    queue.push(current.children[0]);
+                }
+
+                if (intersectRayWithShapeNoChange(current.children[1].box, minRay)) {
+                    queue.push(current.children[1]);
+                }
+            }
+            for (int i = 0; i < leafNodes.size(); i++) {
+                for (const auto& tri : leafNodes[i].triangles) {
+
+                    const auto v0 = leafNodes[i].mesh.vertices[tri[0]];
+                    const auto v1 = leafNodes[i].mesh.vertices[tri[1]];
+                    const auto v2 = leafNodes[i].mesh.vertices[tri[2]];
+
+                    if (intersectRayWithTriangle(v0.p, v1.p, v2.p, minRay, hitInfo)) {
+
+                        if (minRay.t < ray.t) {
+                            ray.t = minRay.t;
+                            drawRay(ray, glm::vec3{ 1.0f });
+                            hitInfo.material = leafNodes[i].mesh.material;
+                            hit = true;
+
+                        }
+                    }
                 }
             }
         }
     }
+
     // Intersect with spheres.
     for (const auto& sphere : m_pScene->spheres)
         hit |= intersectRayWithShape(sphere, ray, hitInfo);
