@@ -63,7 +63,7 @@ bool castShadow(glm::vec3 vertexPos, glm::vec3 lightsource, BoundingVolumeHierar
     glm::vec3 direction = glm::normalize(destination - origin);
 
     Ray shadowray;
-    shadowray.origin = origin;
+    shadowray.origin = origin+direction*0.00001f;
     shadowray.direction = direction;
     shadowray.t = INFINITY;
 
@@ -89,12 +89,14 @@ float softShadow(glm::vec3 intersectionPos, SphericalLight sphericalLight, const
         if (castShadow(intersectionPos, center, bvh)) return 1;              // If in shadow skip further computation for this lightsource
     }
     // we generate random points as point lights
-    int contributions = 0;
-    for (glm::vec3 rpoint : randomVectors) {
-        if (castShadow(intersectionPos, center + rpoint * r, bvh)) contributions++;
+    float contributions = 0;
+    for (int i = 0; i < randomVectors.size(); i++) {
+        if (castShadow(intersectionPos, center + randomVectors[i] * r, bvh)) {
+            contributions++;
+        }
     }
 
-    float coverage = contributions / randomVectors.size();  // calculate percentage of the light coverage
+    float coverage = (contributions / randomVectors.size());  // calculate percentage of the light coverage
     return coverage;
 }
 
@@ -151,7 +153,7 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     }
     Ray rey{ intersectPos, hitInfo.normal, 1 };
     glm::vec3 res = diffuse + spec;
-    //drawRay(rey, res);
+    //drawRay(ray, res);
     return res;
 }
 
@@ -219,6 +221,18 @@ static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHie
         }
     }
     
+/*
+Ray prev = reflect;
+    HitInfo prevHit = hitInfo;
+    if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
+        glm::vec3 resColor = hitColor + getFaceColour(scene, bvh, ray, hitInfo);
+        drawRay(reflect, resColor);
+        if (hitInfo.material.ks != glm::vec3{ 0 }) {
+            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, resColor);
+
+
+
+*/
     return hitColor + getFaceColour(scene, bvh, ray, hitInfo);
 }
 
@@ -230,7 +244,7 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     int level = 10;
 
     if (bvh.intersect(ray, hitInfo)) {
-        drawRay(ray);
+        glm::vec3 res{};
         //Glossy reflection
         if (hitInfo.material.ks != glm::vec3{ 0 } && hitInfo.material.ks.x < 0.9) {
             return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd, true);
@@ -242,12 +256,14 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
         }
         
         else {
-            return getFaceColour(scene, bvh, ray, hitInfo);
+            res = getFaceColour(scene, bvh, ray, hitInfo);
         }
+        drawRay(ray, res);
+        return res;
     }
     else {
         // Draw a red debug ray if the ray missed.
-        //drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
+        drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
