@@ -153,7 +153,7 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     }
     Ray rey{ intersectPos, hitInfo.normal, 1 };
     glm::vec3 res = diffuse + spec;
-    //drawRay(rey, res);
+    //drawRay(ray, res);
     return res;
 }
 
@@ -162,9 +162,10 @@ static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHie
     Ray prev = reflect;
     HitInfo prevHit = hitInfo;
     if (bvh.intersect(reflect, hitInfo) && level < maxLevel) {
-        drawRay(reflect);
+        glm::vec3 resColor = hitColor + getFaceColour(scene, bvh, ray, hitInfo);
+        drawRay(reflect, resColor);
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo));
+            return recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, resColor);
         }
     }
     else {
@@ -182,17 +183,19 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
     int level = 10;
 
     if (bvh.intersect(ray, hitInfo)) {
-        drawRay(ray);
+        glm::vec3 res{};
         if (hitInfo.material.ks != glm::vec3{ 0 }) {
-            return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd);
+            res =  recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd);
         }
         else {
-            return getFaceColour(scene, bvh, ray, hitInfo);
+            res = getFaceColour(scene, bvh, ray, hitInfo);
         }
+        drawRay(ray, res);
+        return res;
     }
     else {
         // Draw a red debug ray if the ray missed.
-        //drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
+        drawRay(ray, glm::vec3(1.0f, 0.0f, 0.0f));
         // Set the color of the pixel to black if the ray misses.
         return glm::vec3(0.0f);
     }
