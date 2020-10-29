@@ -13,6 +13,7 @@ DISABLE_WARNINGS_PUSH()
 #include <glm/vec4.hpp>
 #include <imgui.h>
 DISABLE_WARNINGS_POP()
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -271,19 +272,49 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 
 }
 
+glm::vec3 getBrightPass(glm::vec3 color) {
+    if (color.x + color.y + color.z > 2.8f) {
+        return color; // 1 is white
+    }
+    return glm::vec3{ 0,0,0 }; // black
+}
+
+glm::vec3 boxFilter(Screen& screen, int i, int j, int filterSize) {
+    filterSize = std::max(1, filterSize);
+    glm::vec3 sum = {0,0,0};
+    for (int x = -filterSize; x < filterSize + 1; ++x) {
+        if ((x+j > 0) && (x+j < windowResolution.x)) {
+                for (int y = -filterSize; y < filterSize + 1; ++y) {
+                    if ((y+i >= 0) && (y+i < windowResolution.y)) {
+                        sum = sum + getBrightPass(screen.getPixel(i + y, j+ x));
+                }
+            }
+        }
+    }
+    int multvalue = (2 * filterSize + 1) * (2 * filterSize + 1);
+    sum = glm::vec3((sum.x/multvalue),(sum.y/multvalue),(sum.z/multvalue));
+    return sum;
+}
+
+void applyEffect(Screen& screen) {
+    for (int y = 0; y < windowResolution.y; y++) {
+        for (int x = 0; x != windowResolution.x; x++) {
+            glm::vec3 o = screen.getPixel(y, x);
+            glm::vec3 c = boxFilter(screen, y, x, 6);
+            screen.setPixel(y, x, o+c);
+        }
+    }
+}
+
 static void setOpenGLMatrices(const Trackball& camera);
 static void renderOpenGL(const Scene& scene, const Trackball& camera, int selectedLight);
 
 // This is the main rendering function. You are free to change this function in any way (including the function signature).
 static void renderRayTracing(const Scene& scene, const Trackball& camera, const BoundingVolumeHierarchy& bvh, Screen& screen)
 {
-
 #ifdef USE_OPENMP
 #pragma omp parallel for
 #endif
-    
-
-
     for (int y = 0; y < windowResolution.y; y++) {
         for (int x = 0; x != windowResolution.x; x++) {
             // NOTE: (-1, -1) at the bottom left of the screen, (+1, +1) at the top right of the screen.
