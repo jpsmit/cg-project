@@ -11,9 +11,9 @@ public:
     struct Node {
         AxisAlignedBox box{ glm::vec3{0.0f}, glm::vec3{1.0f} };
         int level = 0;
-        std::vector<Node> children {};
+        std::vector<int> children {};
         bool leafNode = true;
-        Mesh mesh;
+        int mesh = 0;
         std::vector<Triangle> triangles;
     };
 

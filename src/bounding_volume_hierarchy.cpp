@@ -102,21 +102,27 @@ std::vector<Triangle> getTriangles(Mesh mesh) {
 * level is the number of times the current box has been split. Max number of times is 11, and it will stop there or earlier if each triangle is found.
 */
 
-BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, Mesh mesh, int axis, int level) {    
+int shrinkBox(AxisAlignedBox box, std::vector<Triangle> scene, Mesh mesh, int axis, int level, int meshNum) {    
     
     //Stopping the algorithm if the scene becomes empty, or the maximum level is reached.
     if (scene.size() == 0) {
-        std::vector<BoundingVolumeHierarchy::Node> children {};
-        BoundingVolumeHierarchy::Node node{ AxisAlignedBox{ glm::vec3{0}, glm::vec3{0} }, level, children, true, mesh, scene };
-        //nodes.push_back(node);
-        return node;
+        std::vector<int> children {};
+        BoundingVolumeHierarchy::Node node{ AxisAlignedBox{ glm::vec3{0}, glm::vec3{0} }, level, children, true, meshNum, scene };
+        nodes.push_back(node);
+        if (node.level == 0) {
+            rootNodes.push_back(node);
+        }
+        return nodes.size() - 1;
     }
     else if (scene.size() == 1 || level > 6) {
         AxisAlignedBox box = setBox(scene, mesh);
-        std::vector<BoundingVolumeHierarchy::Node> children{};
-        BoundingVolumeHierarchy::Node node{ box, level, children, true, mesh, scene };
+        std::vector<int> children{};
+        BoundingVolumeHierarchy::Node node{ box, level, children, true, meshNum, scene };
         nodes.push_back(node);
-        return node;
+        if (node.level == 0) {
+            rootNodes.push_back(node);
+        }
+        return nodes.size()-1;
     }
     
     // splitting along the X axis
@@ -138,12 +144,15 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
         AxisAlignedBox box1 = setBox(firstSet, mesh);
         AxisAlignedBox box2 = setBox(secondSet, mesh);
 
-        BoundingVolumeHierarchy::Node node1 = shrinkBox(box1, firstSet, mesh, 1, level + 1);
-        BoundingVolumeHierarchy::Node node2 = shrinkBox(box2, secondSet, mesh, 1, level + 1);
-        std::vector<BoundingVolumeHierarchy::Node> children{ node1 , node2};
+        int node1 = shrinkBox(box1, firstSet, mesh, 1, level + 1, meshNum);
+        int node2 = shrinkBox(box2, secondSet, mesh, 1, level + 1, meshNum);
+        std::vector<int> children{ node1 , node2};
         BoundingVolumeHierarchy::Node currentNode{ box, level, children, false };
+        if (level == 0) {
+            rootNodes.push_back(currentNode);
+        }
         nodes.push_back(currentNode);
-        return currentNode;
+        return nodes.size() - 1;
             
             
     }
@@ -166,13 +175,13 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
         AxisAlignedBox box2 = setBox(secondSet, mesh); 
-        BoundingVolumeHierarchy::Node node1 = shrinkBox(box1, firstSet, mesh, 2, level + 1);
-        BoundingVolumeHierarchy::Node node2 = shrinkBox(box2, secondSet, mesh, 2, level + 1);
-        std::vector<BoundingVolumeHierarchy::Node> children{ node1, node2 };
+        int node1 = shrinkBox(box1, firstSet, mesh, 2, level + 1, meshNum);
+        int node2 = shrinkBox(box2, secondSet, mesh, 2, level + 1, meshNum);
+        std::vector<int> children{ node1, node2 };
 
         BoundingVolumeHierarchy::Node currentNode{ box, level, children, false };
         nodes.push_back(currentNode);
-        return currentNode;
+        return nodes.size()-1;
 
     }
 
@@ -194,12 +203,12 @@ BoundingVolumeHierarchy::Node shrinkBox(AxisAlignedBox box, std::vector<Triangle
 
         AxisAlignedBox box1 = setBox(firstSet, mesh);
         AxisAlignedBox box2 = setBox(secondSet, mesh);
-        BoundingVolumeHierarchy::Node node1 = shrinkBox(box1, firstSet, mesh, 0, level + 1);
-        BoundingVolumeHierarchy::Node node2 = shrinkBox(box2, secondSet, mesh, 0, level + 1);
-        std::vector<BoundingVolumeHierarchy::Node> children{ node1, node2 };
+        int node1 = shrinkBox(box1, firstSet, mesh, 0, level + 1, meshNum);
+        int node2 = shrinkBox(box2, secondSet, mesh, 0, level + 1, meshNum);
+        std::vector<int> children{ node1, node2 };
         BoundingVolumeHierarchy::Node currentNode{ box, level, children, false };
         nodes.push_back(currentNode);
-        return currentNode;
+        return nodes.size() - 1;
     }
 
     //if it somehow gets here we have a problem
@@ -215,13 +224,13 @@ BoundingVolumeHierarchy::BoundingVolumeHierarchy(Scene* pScene)
 {
     nodes = {};
     rootNodes = {};
+    int i = 0;
     for (Mesh mesh : pScene->meshes) {
         AxisAlignedBox overallBox = largestBoxSize(pScene);
         std::vector<Triangle> totalTriangles = getTriangles(mesh);
-        BoundingVolumeHierarchy::Node root = shrinkBox(overallBox, totalTriangles, mesh, 0, 0);
-        rootNodes.push_back(root);
-    }
-    
+        shrinkBox(overallBox, totalTriangles, mesh, 0, 0, i);
+        i++;
+    }    
 
     // as an example of how to iterate over all meshes in the scene, look at the intersect method below
 }
@@ -297,27 +306,26 @@ bool BoundingVolumeHierarchy::intersect(Ray& ray, HitInfo& hitInfo) const
                     continue;
                 }
 
-                if (intersectRayWithShapeNoChange(current.children[0].box, minRay)) {
-                    queue.push(current.children[0]);
+                if (intersectRayWithShapeNoChange(nodes[current.children[0]].box, minRay)) {
+                    queue.push(nodes[current.children[0]]);
                 }
 
-                if (intersectRayWithShapeNoChange(current.children[1].box, minRay)) {
-                    queue.push(current.children[1]);
+                if (intersectRayWithShapeNoChange(nodes[current.children[1]].box, minRay)) {
+                    queue.push(nodes[current.children[1]]);
                 }
             }
             for (int i = 0; i < leafNodes.size(); i++) {
                 for (const auto& tri : leafNodes[i].triangles) {
-
-                    const auto v0 = leafNodes[i].mesh.vertices[tri[0]];
-                    const auto v1 = leafNodes[i].mesh.vertices[tri[1]];
-                    const auto v2 = leafNodes[i].mesh.vertices[tri[2]];
+                    const auto v0 = m_pScene->meshes[leafNodes[i].mesh].vertices[tri[0]];
+                    const auto v1 = m_pScene->meshes[leafNodes[i].mesh].vertices[tri[1]];
+                    const auto v2 = m_pScene->meshes[leafNodes[i].mesh].vertices[tri[2]];
 
                     if (intersectRayWithTriangle(v0.p, v1.p, v2.p, minRay, hitInfo)) {
 
                         if (minRay.t < ray.t) {
                             ray.t = minRay.t;
-                            drawRay(ray, glm::vec3{ 1.0f });
-                            hitInfo.material = leafNodes[i].mesh.material;
+                            //drawRay(ray, glm::vec3{ 1.0f });
+                            hitInfo.material = m_pScene->meshes[leafNodes[i].mesh].material;
                             hit = true;
 
                         }
