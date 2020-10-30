@@ -24,6 +24,12 @@ Scene loadScene(SceneType type, const std::filesystem::path& dataDir)
         std::move(std::begin(subMeshes), std::end(subMeshes), std::back_inserter(scene.meshes));
         scene.pointLights.push_back(PointLight { glm::vec3(0, 0.58f, 0), glm::vec3(1) }); // Light at the top of the box
     } break;
+    case CornellBoxGloss: {
+        // Load a 3D model of a Dragon
+        auto subMeshes = loadMesh(dataDir / "gloss.obj", true);
+        std::move(std::begin(subMeshes), std::end(subMeshes), std::back_inserter(scene.meshes));
+        scene.pointLights.push_back(PointLight{ glm::vec3(0, 0.58f, 0), glm::vec3(1) }); // Light at the top of the box
+    } break;
     case CornellBoxSphericalLight: {
         // Load a 3D model of a Dragon
         auto subMeshes = loadMesh(dataDir / "CornellBox-Mirror-Rotated.obj", true);

@@ -35,6 +35,11 @@ std::random_device rd;                                  // NOTE: (Jean-Paul) The
 std::mt19937 gen(rd());                                 // https://stackoverflow.com/questions/9878965/rand-between-0-and-1
 std::uniform_real_distribution<> dis(-1, 1);
 glm::vec3 pixels[windowResolution.y][windowResolution.x];
+
+int glossLevel = 8;
+
+bool enableAi{ false };
+bool renderingToFile{ false };
 enum class ViewMode {
     Rasterization = 0,
     RayTracing = 1
@@ -182,6 +187,7 @@ static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHie
 
         //glm::rotate(, reflect.direction, angle);
         float samples = 8;
+        float samples = (float)glossLevel;
         glm::vec3 basedirection = reflect.direction;
         glm::vec3 finalColor = glm::vec3{ 0.0f };
         int hit = 0;
@@ -194,6 +200,10 @@ static glm::vec3 recursiveRayTracing(const Scene& scene, const BoundingVolumeHie
                 if (hitInfo.material.ks != glm::vec3{ 0.0f } && hitInfo.material.ks.x < 0.9f)
                 {
                     finalColor+= recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo), true);
+                }
+                else if (hitInfo.material.ks != glm::vec3{ 0.0f } && hitInfo.material.ks.x > 0.9f)
+                {
+                    finalColor += recursiveRayTracing(scene, bvh, reflect, hitInfo, level + 1, maxLevel, hitColor + getFaceColour(scene, bvh, ray, hitInfo), false);
                 }
                 else {
                     finalColor += getFaceColour(scene, bvh, ray, hitInfo);
@@ -251,8 +261,6 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
             return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd, true);
         }
         else if (hitInfo.material.ks != glm::vec3{ 0 } && hitInfo.material.ks.x > 0.9) {
-            // NOTE(Jurriaan): Cornell box has default 100% reflection, so if you want the mirror to acts as a
-// glossy or diffuse surface to test glossy reflection, set the true variable to true so it will treat as diffuse/glossy
             return recursiveRayTracing(scene, bvh, ray, hitInfo, 1, 5, hitInfo.material.kd, false);
         }
         
@@ -355,31 +363,39 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
 
             //screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
             pixels[y][x] = col;
-        }
-
-        Screen screenAA = Screen{ windowResolution / 2 };
-        int xO = 0;
-        int yO = 0;
-        yO = 0;
-
-        for (int y = 0; y < windowResolution.y / 2; y++) {
-            xO = 0;
-            for (int x = 0; x != windowResolution.x / 2; x++) {
-                glm::vec3 color = glm::vec3{ 0.0f };
-                if ((yO + 1) < windowResolution.x && (xO + 1) < windowResolution.y) {
-                    color = pixels[yO][xO] + pixels[yO][xO + 1] + pixels[yO + 1][xO] + pixels[yO + 1][xO + 1];
-                    color = glm::vec3(color.x / 4, color.y / 4, color.z / 4);
-                    screenAA.setPixel(x, y, color);
-                    xO += 2;
-                }
+            if (enableAi && renderingToFile) {
+                glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
+                pixels[y][x] = col;
             }
-            yO += 2;
-
+            else {
+                screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
+            }
         }
+        if (enableAi && renderingToFile) {
+            Screen screenAA = Screen{ windowResolution / 2 };
+            int xO = 0;
+            int yO = 0;
+            yO = 0;
+
+            for (int y = 0; y < windowResolution.y / 2; y++) {
+                xO = 0;
+                for (int x = 0; x != windowResolution.x / 2; x++) {
+                    glm::vec3 color = glm::vec3{ 0.0f };
+                    if ((yO + 1) < windowResolution.x && (xO + 1) < windowResolution.y) {
+                        color = pixels[yO][xO] + pixels[yO][xO + 1] + pixels[yO + 1][xO] + pixels[yO + 1][xO + 1];
+                        color = glm::vec3(color.x / 4, color.y / 4, color.z / 4);
+                        screenAA.setPixel(x, y, color);
+                        xO += 2;
+                    }
+                }
+                yO += 2;
+
+            }
 
 
-        screen.clear(glm::vec3{ 1.0f });
-        screen = screenAA;
+            screen.clear(glm::vec3{ 1.0f });
+            screen = screenAA;
+        }
     }
 
 }
@@ -427,7 +443,7 @@ int main(int argc, char** argv)
         // === Setup the UI ===
         ImGui::Begin("Final Project - Part 2");
         {
-            constexpr std::array items{ "SingleTriangle", "Cube", "Cornell Box (with mirror)", "Cornell Box (spherical light and mirror)", "Monkey", "Dragon", /* "AABBs",*/ "Spheres", /*"Mixed",*/ "Custom" };
+            constexpr std::array items{ "SingleTriangle", "Cube", "Cornell Box (with mirror)", "Cornell Box (spherical light and mirror)","Cornell Box Gloss", "Monkey", "Dragon", /* "AABBs",*/ "Spheres", /*"Mixed",*/ "Custom" };
             if (ImGui::Combo("Scenes", reinterpret_cast<int*>(&sceneType), items.data(), int(items.size()))) {
                 optDebugRay.reset();
                 scene = loadScene(sceneType, dataPath);
@@ -444,13 +460,19 @@ int main(int argc, char** argv)
         }
         if (ImGui::Button("Render to file")) {
             {
+                renderingToFile = true;
                 using clock = std::chrono::high_resolution_clock;
                 const auto start = clock::now();
+                Screen prev = screen;
                 renderRayTracing(scene, camera, bvh, screen);
                 const auto end = clock::now();
                 std::cout << "Time to render image: " << std::chrono::duration<float, std::milli>(end - start).count() << " milliseconds" << std::endl;
+                screen.writeBitmapToFile(outputPath / "render.bmp");
+                renderingToFile = false;
+                screen = prev;
+
             }
-            screen.writeBitmapToFile(outputPath / "render.bmp");
+            //screen.writeBitmapToFile(outputPath / "render.bmp");
         }
         ImGui::Spacing();
         ImGui::Separator();
@@ -516,6 +538,17 @@ int main(int argc, char** argv)
                 scene.sphericalLight.erase(std::begin(scene.sphericalLight) + (selectedLight - scene.pointLights.size()));
             }
             selectedLight = 0;
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Text("Glossy reflections");
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::SliderInt("Gloss rays", &glossLevel, 0, 8);
+        }
+        ImGui::Text("Antialiasing");
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::Checkbox("Enable antialiasing", &enableAi);
         }
 
         // Clear screen.
