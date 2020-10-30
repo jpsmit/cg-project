@@ -7,6 +7,16 @@ public:
     BoundingVolumeHierarchy(Scene* pScene);
 
     // Use this function to visualize your BVH. This can be useful for debugging.
+
+    struct Node {
+        AxisAlignedBox box{ glm::vec3{0.0f}, glm::vec3{1.0f} };
+        int level = 0;
+        std::vector<int> children {};
+        bool leafNode = true;
+        int mesh = 0;
+        std::vector<Triangle> triangles;
+    };
+
     void debugDraw(int level);
     int numLevels() const;
 

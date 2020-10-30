@@ -110,7 +110,6 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     glm::vec3 kd = hitInfo.material.kd;
     float lightIntensity = 1.0f;
 
-    //float count = 0;
     glm::vec3 diffuse{ 0 };
     glm::vec3 spec{ 0 };
     for (SphericalLight const slight : scene.sphericalLight) {
@@ -125,7 +124,6 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
             diffuse = diffuse + (kd * slight.color * dot) * lightIntensity;
         }
 
-        //count++;
         glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
         glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
 
@@ -146,7 +144,6 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
             diffuse = diffuse + (kd * light.color * dot) * lightIntensity;
         }
 
-        //count++;
         glm::vec3 viewVec = glm::normalize(intersectPos - ray.origin);
         glm::vec3 reflectionVec = glm::normalize(glm::reflect(lightVec, hitInfo.normal));
 
