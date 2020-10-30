@@ -132,7 +132,7 @@ static glm::vec3 getFaceColour(const Scene& scene, const BoundingVolumeHierarchy
     }
 
     for (PointLight const light : scene.pointLights) {
-        if (!castShadow(intersectPos, light.position, bvh)) { lightIntensity = 1; }
+        if (castShadow(intersectPos, light.position, bvh)) { lightIntensity = 0; }
         glm::vec3 lightVec = glm::normalize(light.position - intersectPos);
         glm::vec3 normal = glm::normalize(hitInfo.normal);
 
@@ -279,28 +279,56 @@ glm::vec3 getBrightPass(glm::vec3 color) {
     return glm::vec3{ 0,0,0 }; // black
 }
 
-glm::vec3 boxFilter(Screen& screen, int i, int j, int filterSize) {
+float getBrightPass(float color) {
+    if (color > 0.99f) {
+        return color; // 1 is white
+    }
+    return 0.0f; // black
+}
+
+//glm::vec3 boxFilter(Screen& screen, int i, int j, int filterSize) {
+//    filterSize = std::max(1, filterSize);
+//    glm::vec3 sum = {0,0,0};
+//    for (int x = -filterSize; x < filterSize + 1; ++x) {
+//        if ((x+j > 0) && (x+j < windowResolution.x)) {
+//                for (int y = -filterSize; y < filterSize + 1; ++y) {
+//                    if ((y+i >= 0) && (y+i < windowResolution.y)) {
+//                        sum = sum + getBrightPass(screen.getPixel(i + y, j+ x));
+//                }
+//            }
+//        }
+//    }
+//    int multvalue = (2 * filterSize + 1) * (2 * filterSize + 1);
+//    sum = glm::vec3((sum.x/multvalue),(sum.y/multvalue),(sum.z/multvalue));
+//    return sum;
+//}
+
+float boxFilter(Screen& screen, int i, int j, int col, int filterSize) {
     filterSize = std::max(1, filterSize);
-    glm::vec3 sum = {0,0,0};
+    float sum = 0.0f;
     for (int x = -filterSize; x < filterSize + 1; ++x) {
-        if ((x+j > 0) && (x+j < windowResolution.x)) {
-                for (int y = -filterSize; y < filterSize + 1; ++y) {
-                    if ((y+i >= 0) && (y+i < windowResolution.y)) {
-                        sum = sum + getBrightPass(screen.getPixel(i + y, j+ x));
+        if ((x + j > 0) && (x + j < windowResolution.x)) {
+            for (int y = -filterSize; y < filterSize + 1; ++y) {
+                if ((y + i >= 0) && (y + i < windowResolution.y)) {
+                    sum = sum + getBrightPass(screen.getPixel(i + y, j + x)[col]);
                 }
             }
         }
     }
     int multvalue = (2 * filterSize + 1) * (2 * filterSize + 1);
-    sum = glm::vec3((sum.x/multvalue),(sum.y/multvalue),(sum.z/multvalue));
+    sum = sum/multvalue;
     return sum;
 }
+
 
 void applyEffect(Screen& screen) {
     for (int y = 0; y < windowResolution.y; y++) {
         for (int x = 0; x != windowResolution.x; x++) {
             glm::vec3 o = screen.getPixel(y, x);
-            glm::vec3 c = boxFilter(screen, y, x, 6);
+            glm::vec3 c;
+            for (int i = 0; i < 3; i++) {
+                 c[i] = boxFilter(screen, y, x, i, 6);
+            }
             screen.setPixel(y, x, o+c);
         }
     }
@@ -324,6 +352,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
             };
             const Ray cameraRay = camera.generateRay(normalizedPixelPos);
             glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
+
             //screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
             pixels[y][x] = col;
         }
