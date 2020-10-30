@@ -36,6 +36,7 @@ std::uniform_real_distribution<> dis(-1, 1);
 glm::vec3 pixels[windowResolution.y][windowResolution.x];
 
 int glossLevel = 8;
+int sampleLevel = 8;
 
 bool enableAi{ false };
 bool renderingToFile{ false };
@@ -95,13 +96,13 @@ float softShadow(glm::vec3 intersectionPos, SphericalLight sphericalLight, const
     }
     // we generate random points as point lights
     float contributions = 0;
-    for (int i = 0; i < randomVectors.size(); i++) {
+    for (int i = 0; i < sampleLevel; i++) {
         if (castShadow(intersectionPos, center + randomVectors[i] * r, bvh)) {
             contributions++;
         }
     }
 
-    float coverage = (contributions / randomVectors.size());  // calculate percentage of the light coverage
+    float coverage = (contributions / sampleLevel);  // calculate percentage of the light coverage
     return coverage;
 }
 
@@ -336,7 +337,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
 
 int main(int argc, char** argv)
 {
-    initialize(8);  // initialize random vectors with 8 samples
+    initialize(32);  // initialize random vectors with 8 samples
     Trackball::printHelp();
     std::cout << "\n Press the [R] key on your keyboard to create a ray towards the mouse cursor" << std::endl
         << std::endl;
@@ -477,6 +478,12 @@ int main(int argc, char** argv)
             selectedLight = 0;
         }
 
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Text("Soft Shadows");
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::SliderInt("Samples", &sampleLevel, 0, 32);
+        }
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Text("Glossy reflections");
