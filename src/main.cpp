@@ -38,6 +38,7 @@ glm::vec3 pixels[windowResolution.y][windowResolution.x];
 int glossLevel = 8;
 
 bool enableAi{ false };
+bool renderingToFile{ false };
 enum class ViewMode {
     Rasterization = 0,
     RayTracing = 1
@@ -298,7 +299,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 float(y) / windowResolution.y * 2.0f - 1.0f
             };
             const Ray cameraRay = camera.generateRay(normalizedPixelPos);
-            if (enableAi) {
+            if (enableAi && renderingToFile) {
                 glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
                 pixels[y][x] = col;
             }
@@ -306,7 +307,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
             }
         }
-        if (enableAi) {
+        if (enableAi && renderingToFile) {
             Screen screenAA = Screen{ windowResolution / 2 };
             int xO = 0;
             int yO = 0;
@@ -398,13 +399,19 @@ int main(int argc, char** argv)
         }
         if (ImGui::Button("Render to file")) {
             {
+                renderingToFile = true;
                 using clock = std::chrono::high_resolution_clock;
                 const auto start = clock::now();
+                Screen prev = screen;
                 renderRayTracing(scene, camera, bvh, screen);
                 const auto end = clock::now();
                 std::cout << "Time to render image: " << std::chrono::duration<float, std::milli>(end - start).count() << " milliseconds" << std::endl;
+                screen.writeBitmapToFile(outputPath / "render.bmp");
+                renderingToFile = false;
+                screen = prev;
+
             }
-            screen.writeBitmapToFile(outputPath / "render.bmp");
+            //screen.writeBitmapToFile(outputPath / "render.bmp");
         }
         ImGui::Spacing();
         ImGui::Separator();
