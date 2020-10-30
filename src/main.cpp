@@ -34,11 +34,14 @@ std::random_device rd;                                  // NOTE: (Jean-Paul) The
 std::mt19937 gen(rd());                                 // https://stackoverflow.com/questions/9878965/rand-between-0-and-1
 std::uniform_real_distribution<> dis(-1, 1);
 glm::vec3 pixels[windowResolution.y][windowResolution.x];
+glm::vec3 bpixels[windowResolution.y][windowResolution.x];
 
 int glossLevel = 8;
 int sampleLevel = 8;
+int bloomFilterSize = 3;
 
 bool enableAi{ false };
+bool enableBloom{ false };
 bool renderingToFile{ false };
 enum class ViewMode {
     Rasterization = 0,
@@ -276,6 +279,33 @@ static glm::vec3 getFinalColor(const Scene& scene, const BoundingVolumeHierarchy
 
 }
 
+float boxFilter(glm::vec3 bpix[960][1200], int i, int j, int col, int filterSize) {
+    filterSize = std::max(1, filterSize);
+    float sum = 0.0f;
+    for (int x = -filterSize; x < filterSize + 1; ++x) {
+        if ((x + j > 0) && (x + j < windowResolution.x)) {
+            for (int y = -filterSize; y < filterSize + 1; ++y) {
+                if ((y + i >= 0) && (y + i < windowResolution.y)) {
+                    sum = sum + bpixels[i + y][j + x][col];
+                }
+            }
+        }
+    }
+    int multvalue = (2 * filterSize + 1) * (2 * filterSize + 1);
+    sum = sum / multvalue;
+    return sum;
+}
+
+glm::vec3 getBrightPass(glm::vec3 color) {
+    glm::vec3 result = glm::vec3{ 0.0f };
+    for (int i = 0; i < 3; i++) {
+        if (color[i] > 1.0f) {
+            result[i] = color[i];
+        }
+    }
+    return result;
+}
+
 static void setOpenGLMatrices(const Trackball& camera);
 static void renderOpenGL(const Scene& scene, const Trackball& camera, int selectedLight);
 
@@ -297,6 +327,12 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 float(y) / windowResolution.y * 2.0f - 1.0f
             };
             const Ray cameraRay = camera.generateRay(normalizedPixelPos);
+            if (enableBloom && renderingToFile) {
+                glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
+                pixels[y][x] = col;
+                glm::vec3 bcol = getBrightPass(col);
+                bpixels[y][x] = bcol;
+            }
             if (enableAi && renderingToFile) {
                 glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
                 pixels[y][x] = col;
@@ -305,6 +341,23 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
             }
         }
+    }
+
+    if (enableBloom && renderingToFile) {
+        Screen screenBB = Screen{ windowResolution };
+
+        for (int y = 0; y < windowResolution.y; y++) {
+            for (int x = 0; x != windowResolution.x; x++) {
+                glm::vec3 color = glm::vec3{ 0.0f };
+                for (int i =0; i < 3; i++) {
+                    color[i] = boxFilter(bpixels, y, x, i, bloomFilterSize);
+                }
+                screenBB.setPixel(x, y, color+pixels[y][x]);
+            }
+        }
+
+        screen.clear(glm::vec3{ 1.0f });
+        screen = screenBB;
     }
 
     if (enableAi && renderingToFile) {
@@ -494,7 +547,13 @@ int main(int argc, char** argv)
         if (viewMode == ViewMode::Rasterization) {
             ImGui::Checkbox("Enable antialiasing", &enableAi);
         }
-
+        ImGui::Text("Bloom Filter");
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::Checkbox("Enable bloomfilter", &enableBloom);
+        }
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::SliderInt("Filter Size", &bloomFilterSize, 0, 10);
+        }
         // Clear screen.
         glClearDepth(1.0f);
         glClearColor(0.0, 0.0, 0.0, 0.0);
