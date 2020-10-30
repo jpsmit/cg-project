@@ -304,31 +304,32 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 screen.setPixel(x, y, getFinalColor(scene, bvh, cameraRay));
             }
         }
-        if (enableAi && renderingToFile) {
-            Screen screenAA = Screen{ windowResolution / 2 };
-            int xO = 0;
-            int yO = 0;
-            yO = 0;
+    }
 
-            for (int y = 0; y < windowResolution.y / 2; y++) {
-                xO = 0;
-                for (int x = 0; x != windowResolution.x / 2; x++) {
-                    glm::vec3 color = glm::vec3{ 0.0f };
-                    if ((yO + 1) < windowResolution.x && (xO + 1) < windowResolution.y) {
-                        color = pixels[yO][xO] + pixels[yO][xO + 1] + pixels[yO + 1][xO] + pixels[yO + 1][xO + 1];
-                        color = glm::vec3(color.x / 4, color.y / 4, color.z / 4);
-                        screenAA.setPixel(x, y, color);
-                        xO += 2;
-                    }
+    if (enableAi && renderingToFile) {
+        Screen screenAA = Screen{ windowResolution / 2 };
+        int xO = 0;
+        int yO = 0;
+        yO = 0;
+
+        for (int y = 0; y < windowResolution.y / 2; y++) {
+            xO = 0;
+            for (int x = 0; x != windowResolution.x / 2; x++) {
+                glm::vec3 color = glm::vec3{ 0.0f };
+                if ((yO + 1) < windowResolution.x && (xO + 1) < windowResolution.y) {
+                    color = pixels[yO][xO] + pixels[yO][xO + 1] + pixels[yO + 1][xO] + pixels[yO + 1][xO + 1];
+                    color = glm::vec3(color.x / 4, color.y / 4, color.z / 4);
+                    screenAA.setPixel(x, y, color);
+                    xO += 2;
                 }
-                yO += 2;
-
             }
+            yO += 2;
 
-
-            screen.clear(glm::vec3{ 1.0f });
-            screen = screenAA;
         }
+
+
+        screen.clear(glm::vec3{ 1.0f });
+        screen = screenAA;
     }
 
 }
