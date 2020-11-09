@@ -39,6 +39,7 @@ glm::vec3 bpixels[windowResolution.y][windowResolution.x];
 int glossLevel = 8;
 int sampleLevel = 8;
 int bloomFilterSize = 3;
+float bPassValue = 0.99f;
 
 bool enableAi{ false };
 bool enableBloom{ false };
@@ -299,7 +300,7 @@ float boxFilter(glm::vec3 bpix[960][1200], int i, int j, int col, int filterSize
 glm::vec3 getBrightPass(glm::vec3 color) {
     glm::vec3 result = glm::vec3{ 0.0f };
     for (int i = 0; i < 3; i++) {
-        if (color[i] > 1.0f) {
+        if (color[i] > bPassValue) {
             result[i] = color[i];
         }
     }
@@ -332,8 +333,7 @@ static void renderRayTracing(const Scene& scene, const Trackball& camera, const 
                 pixels[y][x] = col;
                 glm::vec3 bcol = getBrightPass(col);
                 bpixels[y][x] = bcol;
-            }
-            if (enableAi && renderingToFile) {
+            } else if (enableAi && renderingToFile) {
                 glm::vec3 col = getFinalColor(scene, bvh, cameraRay);
                 pixels[y][x] = col;
             }
@@ -553,6 +553,9 @@ int main(int argc, char** argv)
         }
         if (viewMode == ViewMode::Rasterization) {
             ImGui::SliderInt("Filter Size", &bloomFilterSize, 0, 10);
+        }
+        if (viewMode == ViewMode::Rasterization) {
+            ImGui::SliderFloat("Threshold", &bPassValue, 0.0f, 1.0f);
         }
         // Clear screen.
         glClearDepth(1.0f);
